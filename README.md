@@ -68,6 +68,7 @@ npm ci
 | コマンド | 内容 |
 |---|---|
 | `npm run build` | `tsc` で `src/` を `dist/` にビルドする (ESM + `.d.ts`) |
+| `npm run check:dist` | `dist/` を空にしてビルドし直し、コミット済みの `dist/` と一致することを検査する (`git status --porcelain dist/` が空なら成功) |
 | `npm run typecheck` | `src/` と `test/` と `vitest.config.ts` を `tsc` で型検査する (出力なし)。`npm run build` は `src/` しか見ないので、テストの型はこちらで検査する |
 | `npm test` | Vitest でテストを実行する |
 | `npm run test:cov` | カバレッジ付きでテストを実行する |
@@ -76,6 +77,6 @@ npm ci
 
 ### `dist/` をコミットする規律
 
-git 参照でインストールできるように、ビルド済みの `dist/` をリポジトリにコミットしています。`src/` を変えた PR では、最後に `npm run build` を実行して `dist/` を再生成し、ソースの変更とは別のコミットとして含めてください。CI は「`dist/` を空にしてからビルドし、`git status --porcelain dist/` が空であること」を検査し、`dist/` がソースとずれている PR を失敗させます。
+git 参照でインストールできるように、ビルド済みの `dist/` をリポジトリにコミットしています。`src/` を変えた PR では、最後に `npm run build` を実行して `dist/` を再生成し、ソースの変更とは別のコミットとして含めてください。PR を出す前に `npm run check:dist` を実行し、コミット済みの `dist/` が現在のソースから生成されるものと一致することを確かめてください (`dist/` を空にしてからビルドし、`git status --porcelain dist/` が空であることを検査します。`git diff` では新規ファイルの追加漏れと古い出力の削除漏れを検出できません)。CI はまだありません。計画の PR 2 で CI を入れ、同じ検査を PR ごとに走らせる予定です。
 
 `prepare` スクリプトは足さないでください。git 参照のインストールでは利用側で `prepare` が実行され、利用側に TypeScript が要るようになります。

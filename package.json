@@ -18,6 +18,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "check:dist": "rm -rf dist && tsc -p tsconfig.json && test -z \"$(git status --porcelain dist/)\"",
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
