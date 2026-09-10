@@ -28,6 +28,12 @@
  *   5. surface / operation / error_type / 正規化したメッセージのそれぞれについて `\` を `\\` に、
  *      `|` を `\|` に escape してから `|` で連結し、UTF-8 の SHA-1 の 16 進表現の先頭 16 文字を
  *      fingerprint とする
+ *
+ * 契約の限界 (孤立サロゲート): JS 側で文字列を UTF-16 単位に切り詰めた結果 (例:
+ * `"boom 😀".slice(0, 6)`) のように、対にならないサロゲートを含むメッセージでは両言語の値が
+ * 揃わない。ts 側は Node の既定に従って U+FFFD に置き換えて値を返す (ログの呼び出しは投げない
+ * 方針に合わせる) が、py 側は UnicodeEncodeError になり、その行に fingerprint が付かない。
+ * どちらに揃えるかは py-gn-log 側で決める (未決)。
  */
 
 import { createHash } from "node:crypto";
