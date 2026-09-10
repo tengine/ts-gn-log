@@ -6,6 +6,7 @@
  * 関数を組み合わせて入口 (`createLogger()`) を作る。
  */
 
+import { contextFields } from "./context.js";
 import { type Env, isEnabled, type Level } from "./level.js";
 
 /** 出力形式を明示的に指定する環境変数とその値。未設定なら provider の入口が渡す既定に従う */
@@ -48,7 +49,7 @@ export interface LogRecord {
   level: Level;
   message: string;
   timestamp: Date;
-  /** 子ロガーの固定フィールドと呼び出し時のフィールドを合わせたもの (`err` は含まない) */
+  /** 文脈 (ts-gn-log/context)、子ロガーの固定フィールド、呼び出し時のフィールドを合わせたもの (`err` は含まない) */
   fields: Record<string, unknown>;
   /** 呼び出し時に `err` として渡されたもの。Error でなくてもよい */
   err?: unknown;
@@ -180,9 +181,13 @@ export function createCoreLogger(options: CoreLoggerOptions): Logger {
       let record: LogRecord | undefined;
       let line: string;
       try {
-        // 固定フィールド (child) と呼び出し時のフィールドを合流させてから err を分離する。
-        // child({ err }) で渡した err も同じ扱いにするため
-        const merged: Record<string, unknown> = { ...baseFields, ...(fields ?? {}) };
+        // 文脈 (ts-gn-log/context) < 固定フィールド (child) < 呼び出し時のフィールド の順に
+        // 重ねてから err を分離する。child({ err }) で渡した err も同じ扱いにするため
+        const merged: Record<string, unknown> = {
+          ...contextFields(),
+          ...baseFields,
+          ...(fields ?? {}),
+        };
         const { err, ...rest } = merged;
         record = { name, level: recordLevel, message, timestamp: now(), fields: rest };
         if ("err" in merged) record.err = err;
