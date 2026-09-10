@@ -58,6 +58,14 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
     expect(normalizeMessage("abcdef", Number.NaN)).toBe("");
   });
 
+  it("数値でない maxLength も slice と同じく 0 として扱う (JS からの利用や設定値)", () => {
+    for (const n of ["abc", {}, [1, 2], null, undefined]) {
+      const value = n as unknown as number;
+      expect(normalizeMessage("abcdef", value)).toBe(Array.from("abcdef").slice(0, value).join(""));
+    }
+    expect(normalizeMessage("abcdef", "abc" as unknown as number)).toBe("");
+  });
+
   it("巨大なメッセージ (10MB) でも配列に展開せず切り詰める", () => {
     const big = "x".repeat(10 * 1024 * 1024);
     expect(Array.from(normalizeMessage(big))).toHaveLength(300);

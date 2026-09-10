@@ -102,7 +102,10 @@ function truncateCodePoints(s: string, maxLength: number): string {
   // 非整数は `Array.prototype.slice` と同じ意味論で整数に丸める (NaN は 0)。Python の s[:n] は
   // 非整数で TypeError になるので誤用の範囲だが、丸めずに走査の終了判定に使うと切り詰めが
   // 効かなくなる (入力全体が返る) ため、ここで正規化する
-  const limit = Number.isNaN(maxLength) ? 0 : Math.trunc(maxLength);
+  // Math.trunc を先に通す — Number.isNaN は型を見るので、非数値 ('abc' や {}) を先に
+  // 判定しても false になり、Math.trunc の NaN が残る
+  const truncated = Math.trunc(maxLength);
+  const limit = Number.isNaN(truncated) ? 0 : truncated;
   if (limit >= 0 && s.length <= limit) return s;
   let keep = limit;
   if (limit < 0) {
