@@ -5,6 +5,7 @@
  * provider ごとのサブパス (`ts-gn-log/google/cloud-run` など) が決め、このモジュールの
  * 関数を組み合わせて入口 (`createLogger()`) を作る。
  */
+import { type Context } from "./context.js";
 import { type Env, type Level } from "./level.js";
 /** 出力形式を明示的に指定する環境変数とその値。未設定なら provider の入口が渡す既定に従う */
 export declare const GNLOG_FORMAT_ENV_VAR = "GNLOG_FORMAT";
@@ -31,6 +32,8 @@ export interface LogRecord {
     fields: Record<string, unknown>;
     /** 呼び出し時に `err` として渡されたもの。Error でなくてもよい */
     err?: unknown;
+    /** 出力時の文脈 (ts-gn-log/context) のスナップショット。予約キー `trace` は provider の Formatter がここから読む */
+    context: Context;
 }
 /** LogRecord を文字列にする。JSON 形式は改行を含めない (Cloud Logging が 1 行を 1 エントリとして読む) */
 export type Formatter = (record: LogRecord) => string;
