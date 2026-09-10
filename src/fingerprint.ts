@@ -32,8 +32,11 @@
  * 契約の限界 (孤立サロゲート): JS 側で文字列を UTF-16 単位に切り詰めた結果 (例:
  * `"boom 😀".slice(0, 6)`) のように、対にならないサロゲートを含むメッセージでは両言語の値が
  * 揃わない。ts 側は Node の既定に従って U+FFFD に置き換えて値を返す (ログの呼び出しは投げない
- * 方針に合わせる) が、py 側は UnicodeEncodeError になり、その行に fingerprint が付かない。
- * どちらに揃えるかは py-gn-log 側で決める (未決)。
+ * 方針に合わせる) が、py 側は build_fingerprint が UnicodeEncodeError を投げる。それが
+ * Formatter の中で起きるため、error_event を有効にしていると **その ERROR のログ行そのものが
+ * 失われる** (error_event 無しなら同じメッセージが出力されるので、fingerprint の機能が行を
+ * 落としている)。どちらに揃えるかは py-gn-log 側で決める (未決。py 側の行の欠落は
+ * py-gn-log に報告する)。
  *
  * 入力の大きさ: 置換は入力の全体に走るので、この関数群は入力の大きさに比例したメモリを使う。
  * 数十 MB のメッセージでは Node のヒープを使い切り、catch できない fatal OOM でプロセスが
