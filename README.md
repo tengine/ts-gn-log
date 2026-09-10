@@ -68,6 +68,7 @@ npm ci
 | コマンド | 内容 |
 |---|---|
 | `npm run build` | `tsc` で `src/` を `dist/` にビルドする (ESM + `.d.ts`) |
+| `npm run typecheck` | `src/` と `test/` と `vitest.config.ts` を `tsc` で型検査する (出力なし)。`npm run build` は `src/` しか見ないので、テストの型はこちらで検査する |
 | `npm test` | Vitest でテストを実行する |
 | `npm run test:cov` | カバレッジ付きでテストを実行する |
 | `npm run lint` | Biome で lint と書式を検査する |
