@@ -126,6 +126,18 @@ describe("withRequestTrace (Route Handler の薄い包み)", () => {
     expect(Object.keys(ctx)).toEqual(["trace"]);
   });
 
+  it("fields の返り値に予約キーや型違いがあっても、正規化してリクエストを落とさない", async () => {
+    const h1 = withRequestTrace(async () => getContext(), {
+      fields: () => ({ message: "oops", request_id: "r1" }) as unknown as Record<string, unknown>,
+    });
+    const ctx = await h1({ headers: { "x-cloud-trace-context": TID } });
+    expect(Object.keys(ctx).sort()).toEqual(["request_id", "trace"]);
+    const h2 = withRequestTrace(async () => getContext(), {
+      fields: "not-an-object" as unknown as Record<string, unknown>,
+    });
+    expect(Object.keys(await h2({ headers: {} }))).toEqual(["trace"]);
+  });
+
   it("handler が投げても伝播し、文脈は残らない", async () => {
     const handler = withRequestTrace(async () => {
       throw new Error("boom");

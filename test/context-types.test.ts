@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   type ContextFields,
+  normalizeContextFields,
   RESERVED_CONTEXT_KEYS,
   type ReservedContextKey,
   runWithContext,
@@ -51,5 +52,17 @@ describe("予約キーは型で弾く (ContextFields)", () => {
       "err",
     ];
     expect(new Set(keys)).toEqual(RESERVED_CONTEXT_KEYS);
+  });
+});
+
+describe("normalizeContextFields (利用側の関数の返り値を境界で受ける)", () => {
+  it("予約キーを落とし、オブジェクト以外は undefined。投げない", () => {
+    expect(normalizeContextFields({ message: "x", request_id: "r1" })).toEqual({
+      request_id: "r1",
+    });
+    expect(normalizeContextFields(null)).toBeUndefined();
+    expect(normalizeContextFields(["a"])).toBeUndefined();
+    expect(normalizeContextFields("str")).toBeUndefined();
+    expect(normalizeContextFields({})).toEqual({});
   });
 });

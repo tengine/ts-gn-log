@@ -108,6 +108,22 @@ function validateKeys(values: Record<string, unknown>): void {
   }
 }
 
+/**
+ * 動的な値 (利用側の関数の返り値など) を、予約キーを落として ContextFields にする。
+ * オブジェクト以外 (null / 配列 / 文字列) は undefined。投げない — 利用側の関数を境界で
+ * 受ける側 (withRequestTrace など) が使う。runWithContext / setContext の直接呼び出しは
+ * 型で弾き、動的な値は実行時のエラーで知らせる (こちらは投げてよい)。
+ */
+export function normalizeContextFields(value: unknown): ContextFields | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+    if (RESERVED_CONTEXT_KEYS.has(key)) continue;
+    out[key] = v;
+  }
+  return out as ContextFields;
+}
+
 /** 現在の文脈。何も置かれていなければ空 */
 export function getContext(): Context {
   return storage.getStore()?.values ?? EMPTY;

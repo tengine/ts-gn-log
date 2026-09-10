@@ -14,7 +14,7 @@
  * - https://cloud.google.com/trace/docs/trace-context
  */
 
-import type { ContextFields } from "../context.js";
+import { type ContextFields, normalizeContextFields } from "../context.js";
 import type { Env } from "../level.js";
 import {
   currentTrace,
@@ -141,7 +141,7 @@ export interface RequestLike {
 }
 
 export interface WithRequestTraceOptions<Req> {
-  /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい (投げたら fields 無しで続ける) */
+  /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい (投げたら fields 無し、予約キーは落とす。リクエストは落とさない) */
   fields?: ContextFields | ((request: Req) => ContextFields);
   /** ヘッダに trace が無いときの新規生成。省略時は traceId だけ (spanId / sampled は不明)。不正な値や例外は既定に倒す */
   newTrace?: () => TraceContext;
@@ -184,8 +184,10 @@ function safeFields<Req>(
   fields: WithRequestTraceOptions<Req>["fields"],
   request: Req,
 ): ContextFields | undefined {
+  // newTrace と同じく返り値を正規化する (オブジェクト以外は捨て、予約キーは落とす)。
+  // 例外も既定 (fields 無し) に倒す
   try {
-    return typeof fields === "function" ? fields(request) : fields;
+    return normalizeContextFields(typeof fields === "function" ? fields(request) : fields);
   } catch {
     return undefined;
   }
