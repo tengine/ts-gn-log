@@ -1,1 +1,80 @@
 # ts-gn-log
+
+ts-gn-log は、Cloud Run 上の Node.js サーバから Cloud Logging 向けの構造化ログを出すための TypeScript ライブラリです。[py-gn-log](https://github.com/tengine/py-gn-log) の TypeScript 版で、出力の契約 (キー名、trace の運び方、fingerprint の規則) を py-gn-log と共有します。設計は [docs/designs/0001-ts-gn-log-design.md](docs/designs/0001-ts-gn-log-design.md) を参照してください。
+
+対象は Node.js で動くサーバ側コード (当面は Next.js の Route Handler、`runtime = 'nodejs'`) です。ブラウザ側と Next.js middleware (edge) は対象外です。
+
+## パッケージの構造
+
+py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS 等) を知らない共通部で、provider ごとの実装はサブパスにあります。利用側は使う provider のサブパスを明示的に import し、そこを入口にします。
+
+| サブパス | 役割 | 状態 |
+|---|---|---|
+| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | 空 (機能を足す PR で埋める) |
+| `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 未実装 |
+| `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 未実装 |
+| `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 未実装 |
+| `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し | 未実装 |
+| `ts-gn-log/trace` | W3C Trace Context (`traceparent`) の解釈・組み立てと、現在の trace の保持 | 未実装 |
+| `ts-gn-log/google/cloud-run` | **Cloud Run 向けの入口** `createLogger()` と `isCloudRun()` | 未実装 |
+| `ts-gn-log/google/cloud-logging` | Cloud Logging 向けの JSON 整形 (severity / labels / stack_trace / fingerprint) | 未実装 |
+| `ts-gn-log/google/cloud-trace` | `X-Cloud-Trace-Context` の解釈と Cloud Logging の特殊フィールド (`logging.googleapis.com/trace` 等) | 未実装 |
+
+## インストール
+
+npm には公開していません。GitHub の public リポジトリを git 参照で使います。tag か SHA で版を固定してください。
+
+```
+npm install github:tengine/ts-gn-log#v0.1.0
+```
+
+`package.json` に書く場合:
+
+```json
+{
+  "dependencies": {
+    "ts-gn-log": "github:tengine/ts-gn-log#v0.1.0"
+  }
+}
+```
+
+ビルド済みの `dist/` (ESM と `.d.ts`) をリポジトリにコミットしているので、利用側に TypeScript は要りません。ランタイム依存はありません。Node 24 以上が必要です。
+
+## 使い方
+
+(機能を足す PR で書く)
+
+## 環境変数
+
+(機能を足す PR で書く)
+
+## Cloud Run での使用
+
+(機能を足す PR で書く)
+
+## 開発者向け
+
+### 前提条件
+
+- Node 24 (`.tool-versions` で指定。asdf などで合わせてください)
+- npm
+
+```
+npm ci
+```
+
+### コマンド
+
+| コマンド | 内容 |
+|---|---|
+| `npm run build` | `tsc` で `src/` を `dist/` にビルドする (ESM + `.d.ts`) |
+| `npm test` | Vitest でテストを実行する |
+| `npm run test:cov` | カバレッジ付きでテストを実行する |
+| `npm run lint` | Biome で lint と書式を検査する |
+| `npm run format` | Biome で書式を整える |
+
+### `dist/` をコミットする規律
+
+git 参照でインストールできるように、ビルド済みの `dist/` をリポジトリにコミットしています。`src/` を変えた PR では、最後に `npm run build` を実行して `dist/` を再生成し、ソースの変更とは別のコミットとして含めてください。CI は「`dist/` を空にしてからビルドし、`git status --porcelain dist/` が空であること」を検査し、`dist/` がソースとずれている PR を失敗させます。
+
+`prepare` スクリプトは足さないでください。git 参照のインストールでは利用側で `prepare` が実行され、利用側に TypeScript が要るようになります。
