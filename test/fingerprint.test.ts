@@ -165,6 +165,13 @@ describe("buildFingerprint (py-gn-log の test_fingerprint.py と同じ事例)",
     );
   });
 
+  it("孤立サロゲートを含んでも投げず、U+FFFD に置き換えた値と一致する", () => {
+    // UTF-16 コード単位で切り詰めると孤立サロゲートができる ("boom 😀".slice(0, 6) の末尾)
+    const lone = "boom \u{1f600}".slice(0, 6);
+    expect(lone.endsWith("\ud83d")).toBe(true);
+    expect(buildFingerprint("s", "o", "t", lone)).toBe(sha1("s|o|t|boom \ufffd"));
+  });
+
   it("連結文字列の UTF-8 SHA-1 の先頭 16 文字", () => {
     expect(buildFingerprint("worker", "orders.create", "validation", "order 1 missing")).toBe(
       sha1("worker|orders.create|validation|order <num> missing"),
