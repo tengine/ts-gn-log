@@ -57,12 +57,12 @@ py-gn-log (`e7119631`) の実出力と、利用プロジェクト A の自前実
 ## 3. API 案
 
 ```ts
-import { createLogger, isCloudRun } from 'ts-gn-log'
+import { createLogger, isCloudRun } from 'ts-gn-log/google/cloud-run'   // provider ごとの入口 (py-gn-log #30 と同じ構造)
 import { runWithContext, getContext } from 'ts-gn-log/context'
-import { traceFromHeaders, traceHeaders, withRequestTrace } from 'ts-gn-log/trace'
+import { traceFromHeaders, traceHeaders, withRequestTrace } from 'ts-gn-log/google/cloud-trace'
 import { normalizeMessage, buildFingerprint } from 'ts-gn-log/fingerprint'
 
-// 初期化 (プロセスで 1 回。py-gn-log の Initializer に相当)
+// 初期化 (プロセスで 1 回。py-gn-log の gnlog.google.cloud_run.setup_logging に相当)
 const log = createLogger({
   name: 'bff',
   labels: { service: 'frontend' },        // logging.googleapis.com/labels
@@ -149,20 +149,37 @@ git 参照ではビルド済みの `dist/` が必要なので、**`dist/` をコ
 
 ## 6. リポジトリ構成案
 
+py-gn-log #30 と同じく、直下は provider (Google Cloud / AWS 等) を知らない共通部、provider ごとの実装は `google/` 配下に置く。`ts-gn-log` (index) は共通部だけを再輸出し、`google/*` を読み込まない。利用側は `ts-gn-log/google/cloud-run` を入口にする。
+
+| py-gn-log | ts-gn-log (サブパス) | 役割 |
+|---|---|---|
+| `gnlog.context` | `ts-gn-log/context` | 文脈 (AsyncLocalStorage の `runWithContext` / `getContext`) |
+| `gnlog.fingerprint` | `ts-gn-log/fingerprint` | `normalizeMessage` / `buildFingerprint` (§2.3 の規則) |
+| `gnlog.level` | `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り |
+| `gnlog.output` | `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout/stderr への書き出し、Logger の核 |
+| `gnlog.trace` | `ts-gn-log/trace` | W3C `traceparent` の解釈・組み立て、現在の trace の保持 (文脈の `trace` キー) |
+| `gnlog.google.cloud_run` | `ts-gn-log/google/cloud-run` | **入口** `createLogger()` (= `setup_logging()`) と `isCloudRun()` |
+| `gnlog.google.cloud_logging` | `ts-gn-log/google/cloud-logging` | Cloud Logging 向け JSON 整形 (severity / labels / stack_trace / errorEvent / fingerprint) |
+| `gnlog.google.cloud_trace` | `ts-gn-log/google/cloud-trace` | `X-Cloud-Trace-Context` の解釈、`logging.googleapis.com/*` フィールド、`projectId`、`traceFromHeaders` / `traceHeaders` / `withRequestTrace` |
+
 ```
 ts-gn-log/
 ├── src/
-│   ├── index.ts        createLogger / isCloudRun / Logger 型
-│   ├── logger.ts       JSON / text の整形、severity、stdout/stderr
-│   ├── context.ts      AsyncLocalStorage の runWithContext / getContext
-│   ├── trace.ts        traceFromHeaders / traceHeaders / withRequestTrace (Web 標準の Headers / Request を受ける)
-│   ├── fingerprint.ts  normalizeMessage / buildFingerprint (py-gn-log #18 と同じ規則)
-│   └── env.ts          isCloudRun / LOG_LEVEL / json 強制
+│   ├── index.ts              共通部 (context / fingerprint / level / output / trace) の再輸出。google は読み込まない
+│   ├── context.ts
+│   ├── fingerprint.ts
+│   ├── level.ts
+│   ├── output.ts
+│   ├── trace.ts
+│   └── google/
+│       ├── cloud-run.ts      createLogger / isCloudRun
+│       ├── cloud-logging.ts  JSON 整形
+│       └── cloud-trace.ts    Web 標準の Headers / Request を受ける
 ├── test/               Vitest。fingerprint のゴールデンベクタは py-gn-log と共有
 ├── dist/               tsc の出力 (ESM + .d.ts)。git 参照で使うためコミットする。CI でソースとの一致を検査
 ├── biome.json
 ├── tsconfig.json       target ES2022, module NodeNext, strict, declaration
-├── package.json        name: ts-gn-log, type: module, exports, engines.node >=24, private: true (npm 非公開。git 参照には影響しない)
+├── package.json        name: ts-gn-log, type: module, exports (上の表のサブパスごと), engines.node >=24, private: true (npm 非公開。git 参照には影響しない)
 └── README.md           py-gn-log の README と同じ構成 (インストール / 使い方 / 環境変数 / Cloud Run / 開発者向け)
 ```
 
@@ -174,4 +191,4 @@ ts-gn-log/
 
 ## 8. py-gn-log 側の状況 (2026-09-10 追記)
 
-設計時 (`e7119631`) に Issue として参照していた #15 (文脈) / #17 (Cloud Trace) / #18 (分類と fingerprint) は、いずれも py-gn-log の main にマージ済み。#30 で provider 固有の実装が `gnlog.google.*` (`cloud_run` / `cloud_logging` / `cloud_trace`) に再配置され、v0.3.0 に上げる PR (#33) がレビュー中。ts-gn-log が揃える契約の正本は、Issue の議論ではなく **main の実装・README・tests** になった。
+設計時 (`e7119631`) に Issue として参照していた #15 (文脈) / #17 (Cloud Trace) / #18 (分類と fingerprint) は、いずれも py-gn-log の main にマージ済み。#30 で provider 固有の実装が `gnlog.google.*` (`cloud_run` / `cloud_logging` / `cloud_trace`) に再配置され (ts-gn-log も最初から同じ構造にする。§6)、v0.3.0 に上げる PR (#33) がレビュー中。ts-gn-log が揃える契約の正本は、Issue の議論ではなく **main の実装・README・tests** になった。
