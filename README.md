@@ -6,7 +6,7 @@ ts-gn-log は、Cloud Run 上の Node.js サーバから Cloud Logging 向けの
 
 ## パッケージの構造
 
-py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS 等) を知らない共通部で、provider ごとの実装はサブパスにあります。利用側は使う provider のサブパスを明示的に import し、そこを入口にします。
+py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS 等) を知らない共通部で、provider ごとの実装はサブパスにあります。利用側は使う provider のサブパスを明示的に import し、そこを入口にします。サブパスと役割の正本は[設計案 §6](docs/designs/0001-ts-gn-log-design.md#6-リポジトリ構成案)で、下の表は実装の状態を添えた要約です。
 
 | サブパス | 役割 | 状態 |
 |---|---|---|
@@ -38,7 +38,7 @@ npm install github:tengine/ts-gn-log#v0.1.0
 }
 ```
 
-ビルド済みの `dist/` (ESM と `.d.ts`) をリポジトリにコミットしているので、利用側に TypeScript は要りません。ランタイム依存はありません。Node 24 以上が必要です。
+ビルド済みの `dist/` (ESM と `.d.ts`) をリポジトリにコミットしているので、利用側に TypeScript は要りません。ランタイム依存はありません。Node 24 以上が必要です。配布方針 (npm に公開しない理由、`dist/` をコミットする理由) の正本は[設計案 §4.3](docs/designs/0001-ts-gn-log-design.md#43-配布-決定-public-リポジトリ--git-参照--dist-をコミット)、依存の方針は [§4.1](docs/designs/0001-ts-gn-log-design.md#41-ランタイム依存-ゼロ)、Node の版は [§4.2](docs/designs/0001-ts-gn-log-design.md#42-開発時の依存-2026-09-09-時点の最新) です。
 
 ## 使い方
 
@@ -77,6 +77,8 @@ npm ci
 
 ### `dist/` をコミットする規律
 
-git 参照でインストールできるように、ビルド済みの `dist/` をリポジトリにコミットしています。`src/` を変えた PR では、最後に `npm run build` を実行して `dist/` を再生成し、ソースの変更とは別のコミットとして含めてください。PR を出す前に `npm run check:dist` を実行し、コミット済みの `dist/` が現在のソースから生成されるものと一致することを確かめてください (`dist/` を空にしてからビルドし、`git status --porcelain dist/` が空であることを検査します。`git diff` では新規ファイルの追加漏れと古い出力の削除漏れを検出できません)。CI はまだありません。計画の PR 2 で CI を入れ、同じ検査を PR ごとに走らせる予定です。
+規律の正本は[設計案 §4.3](docs/designs/0001-ts-gn-log-design.md#43-配布-決定-public-リポジトリ--git-参照--dist-をコミット)です。手順だけを書きます。
 
-`prepare` スクリプトは足さないでください。git 参照のインストールでは利用側で `prepare` が実行され、利用側に TypeScript が要るようになります。
+- `src/` を変えた PR では、最後に `npm run build` を実行して `dist/` を再生成し、ソースの変更とは別のコミットとして含める
+- PR を出す前に `npm run check:dist` を実行し、コミット済みの `dist/` が現在のソースから生成されるものと一致することを確かめる (CI はまだ無く、計画の PR 2 で同じ検査を入れる)
+- `prepare` スクリプトは足さない (理由は §4.3)
