@@ -63,6 +63,34 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
     expect(Array.from(normalizeMessage(big))).toHaveLength(300);
   });
 
+  it("切り詰めは必要な分だけ走査する (入力を配列に展開しない)", () => {
+    // 走査の回数を数える。入力を配列に展開する実装 (Array.from) なら入力の長さ分だけ進むので、
+    // 回数で区別できる (ヒープの増分は GC のタイミングで揺れるので使わない)
+    const original = String.prototype[Symbol.iterator];
+    let steps = 0;
+    Object.defineProperty(String.prototype, Symbol.iterator, {
+      configurable: true,
+      writable: true,
+      value: function* (this: string) {
+        for (const ch of original.call(this)) {
+          steps += 1;
+          yield ch;
+        }
+      },
+    });
+    try {
+      normalizeMessage("x".repeat(100_000));
+    } finally {
+      Object.defineProperty(String.prototype, Symbol.iterator, {
+        configurable: true,
+        writable: true,
+        value: original,
+      });
+    }
+    expect(steps).toBeGreaterThan(0);
+    expect(steps).toBeLessThan(1000);
+  });
+
   it("切り詰めの単位はコードポイント (BMP 外の文字を分断しない。py-gn-log #26 の案 1)", () => {
     const msg = `${"x".repeat(100)}${"😀".repeat(150)}`; // Python では 250 文字、UTF-16 では 400 コード単位
     expect(normalizeMessage(msg)).toBe(msg);
