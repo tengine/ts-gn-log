@@ -54,7 +54,7 @@ export interface LogRecord {
   err?: unknown;
 }
 
-/** LogRecord を 1 行の文字列にする (改行は含めない) */
+/** LogRecord を文字列にする。JSON 形式は改行を含めない (Cloud Logging が 1 行を 1 エントリとして読む) */
 export type Formatter = (record: LogRecord) => string;
 
 /** 整形した 1 行を書き出す */
@@ -136,4 +136,20 @@ export function createCoreLogger(options: CoreLoggerOptions): Logger {
     };
   };
   return make(options.fields ?? {});
+}
+
+/**
+ * `err` をログに載せる文字列にする。Error なら stack (無ければ `name: message`)、
+ * それ以外 (文字列 / unknown) は文字列にする。`message` は変えない。
+ */
+export function describeError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.stack ?? `${err.name}: ${err.message}`;
+  }
+  if (typeof err === "string") return err;
+  try {
+    return JSON.stringify(err) ?? String(err);
+  } catch {
+    return String(err);
+  }
 }

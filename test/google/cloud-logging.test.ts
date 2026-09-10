@@ -71,3 +71,55 @@ describe("jsonFormat (設計案 §2.1 すべての行に付くもの)", () => {
     expect(out.lines).toHaveLength(0);
   });
 });
+
+describe("jsonFormat (設計案 §2.3 ERROR 以上に付くもの)", () => {
+  it("ERROR 以上で err を渡すと stack_trace に err.stack が入る", () => {
+    const { log, last } = makeLogger();
+    const err = new Error("boom");
+    log.error("save failed", { err, error_type: "infra" });
+    const entry = last();
+    expect(entry.stack_trace).toBe(err.stack);
+    expect(entry.stack_trace).toMatch(/^Error: boom\n\s+at /);
+    expect(entry.error_type).toBe("infra");
+    expect(entry).not.toHaveProperty("err");
+    expect(entry).not.toHaveProperty("error");
+  });
+
+  it("CRITICAL でも stack_trace", () => {
+    const { log, last } = makeLogger();
+    log.critical("down", { err: new Error("fatal") });
+    expect(last().stack_trace).toMatch(/^Error: fatal/);
+  });
+
+  it("WARNING 以下で err を渡すと stack_trace ではなく error に入る (Error Reporting に集計させない)", () => {
+    const { log, last } = makeLogger();
+    log.warn("retrying", { err: new Error("transient") });
+    expect(last()).not.toHaveProperty("stack_trace");
+    expect(last().error).toMatch(/^Error: transient/);
+  });
+
+  it("err が Error でなければ文字列にして入れ、message は変えない", () => {
+    const { log, last } = makeLogger();
+    log.error("failed", { err: "plain string" });
+    expect(last()).toMatchObject({ message: "failed", stack_trace: "plain string" });
+    log.error("failed", { err: { code: 42 } });
+    expect(last().stack_trace).toBe('{"code":42}');
+    log.error("failed", { err: undefined });
+    expect(last().stack_trace).toBe("undefined");
+  });
+
+  it("stack の無い Error は name: message", () => {
+    const { log, last } = makeLogger();
+    const err = new Error("no stack");
+    delete err.stack;
+    log.error("x", { err });
+    expect(last().stack_trace).toBe("Error: no stack");
+  });
+
+  it("err を渡さなければ stack_trace も error も付かない", () => {
+    const { log, last } = makeLogger();
+    log.error("plain");
+    expect(last()).not.toHaveProperty("stack_trace");
+    expect(last()).not.toHaveProperty("error");
+  });
+});

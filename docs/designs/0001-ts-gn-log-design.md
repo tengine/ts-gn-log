@@ -92,7 +92,7 @@ export const POST = withRequestTrace(async (req) => { ... }) // Next.js Route Ha
 - **ロガーは `console` を経由せず `process.stdout` / `process.stderr` に 1 行書く** (Next.js の `console` パッチや色付けの影響を受けないため)。severity が ERROR 以上なら stderr、それ以外は stdout (Cloud Run は両方を取り込む)
 - **ローカル (Cloud Run 外) は人が読める text 形式** (`2026-09-09T01:23:45.678Z INFO  bff  message  {fields}`)。`json: true` で JSON を強制できる
 - **Cloud Run 判定は `K_SERVICE` / `CLOUD_RUN_JOB` / `CLOUD_RUN_WORKER_POOL` の存在** (py-gn-log と同じ 3 変数、同じ `!= undefined` 判定)
-- **`err` は `Error` でなくてもよい** (文字列 / unknown を `message` に落とす)
+- **`err` は `Error` でなくてもよい** (Error なら `stack`、文字列 / unknown はその文字列を `stack_trace` に入れる。`message` は変えない。WARNING 以下では `stack_trace` ではなく `error` に入れ、Error Reporting に集計させない)
 - **文脈は AsyncLocalStorage** (`node:async_hooks`)。Next.js の Route Handler は Node の非同期文脈をそのまま通すので、リクエストごとの文脈を全 await 先まで運べる。Python の ContextVar と同じ位置づけ
 - **trace が無いリクエストでは新規に trace id を生成する** (32 hex)。Cloud Run が付ける `X-Cloud-Trace-Context` があればそれを優先。W3C `traceparent` も読む (OpenTelemetry と互換にしておくため。`@opentelemetry/api` 自体には依存しない)
 - **応答 body に載せる trace id は Cloud Trace の trace id にする** (利用側が応答 body に持つキー名はそのまま、値だけが独自形式から Cloud Trace の id に変わる)。利用者報告の値からログを引く運用は維持できる
