@@ -46,9 +46,9 @@ export function createLogger(options) {
     const level = options.level === undefined ? levelFromEnv(env) : parseLevel(options.level);
     // fields: オブジェクト以外 (null / 配列 / 文字列) は無視する
     const fields = isPlainObject(options.fields) ? options.fields : undefined;
-    const format = json
-        ? jsonFormat(options.labels === undefined ? {} : { labels: options.labels })
-        : textFormat;
+    // labels: オブジェクト以外は無視し、値は文字列にする (Cloud Logging の labels は文字列の map)
+    const labels = isPlainObject(options.labels) ? stringValues(options.labels) : undefined;
+    const format = json ? jsonFormat(labels === undefined ? {} : { labels }) : textFormat;
     const core = { name: options.name, level, format };
     if (fields !== undefined)
         core.fields = fields;
@@ -58,4 +58,10 @@ export function createLogger(options) {
 }
 function isPlainObject(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function stringValues(record) {
+    const out = {};
+    for (const [key, value] of Object.entries(record))
+        out[key] = String(value);
+    return out;
 }
