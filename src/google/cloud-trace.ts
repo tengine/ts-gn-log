@@ -20,10 +20,16 @@ import {
   type HeadersLike,
   headerValue,
   INVALID_TRACE_ID,
+  newTraceId,
+  runWithTrace,
+  setTrace,
   type TraceContext,
   traceFromHeaders as traceparentFromHeaders,
   traceHeaders as traceparentHeaders,
 } from "../trace.js";
+
+// 共通部の関数をこのモジュールからも使えるようにする (py-gn-log の cloud_trace と同じ並び)
+export { currentTrace, runWithTrace, setTrace };
 
 /** Cloud Logging の特殊フィールド名 */
 export const TRACE_KEY = "logging.googleapis.com/trace";
@@ -114,4 +120,39 @@ export function traceHeaders(
   if (trace.sampled !== undefined) cloud += `;o=${trace.sampled ? 1 : 0}`;
   headers[CLOUD_TRACE_CONTEXT_HEADER] = cloud;
   return headers;
+}
+
+/** withRequestTrace が受け取るリクエスト。Web 標準の Request でも、headers を持つものなら何でもよい */
+export interface RequestLike {
+  headers: HeadersLike;
+}
+
+export interface WithRequestTraceOptions<Req> {
+  /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい */
+  fields?: Record<string, unknown> | ((request: Req) => Record<string, unknown>);
+  /** ヘッダに trace が無いときの新規生成。省略時は traceId だけ (spanId / sampled は不明) */
+  newTrace?: () => TraceContext;
+}
+
+/**
+ * Next.js の Route Handler (や、headers を持つリクエストを受ける関数) を包み、受信ヘッダの
+ * trace を文脈に置いてから呼ぶ。trace が無ければ新規に生成する (設計案 §3) ので、
+ * 包まれた処理の中では currentTrace() が常に返り、応答 body に載せる trace id にも使える。
+ *
+ * @example
+ * export const POST = withRequestTrace(async (req) => {
+ *   log.info("received");                  // logging.googleapis.com/trace が付く
+ *   return Response.json({ trace_id: currentTrace()?.traceId });
+ * });
+ */
+export function withRequestTrace<Req extends RequestLike, Args extends unknown[], R>(
+  handler: (request: Req, ...args: Args) => R,
+  options: WithRequestTraceOptions<Req> = {},
+): (request: Req, ...args: Args) => R {
+  const generate = options.newTrace ?? (() => ({ traceId: newTraceId() }));
+  return (request, ...args) => {
+    const trace = traceFromHeaders(request.headers) ?? generate();
+    const fields = typeof options.fields === "function" ? options.fields(request) : options.fields;
+    return runWithTrace(trace, fields, () => handler(request, ...args));
+  };
 }

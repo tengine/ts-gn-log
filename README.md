@@ -105,6 +105,28 @@ await runWithContext({}, async () => {
 - 優先順位は 呼び出し時のフィールド > `child()` の固定フィールド > 文脈 です
 - text 形式でも同じくフィールドとして末尾の JSON に出ます
 
+### Cloud Trace と連携して全ログ行に trace を付ける
+
+Cloud Run はリクエストごとに `X-Cloud-Trace-Context` ヘッダ (と W3C の `traceparent`) を付けます。`ts-gn-log/google/cloud-trace` の `withRequestTrace` で Route Handler を包むと、受信ヘッダの trace を文脈に置き、全ログ行に `logging.googleapis.com/trace` / `spanId` / `trace_sampled` が付いて Cloud Logging でリクエスト単位に紐付きます (py-gn-log の `gnlog.google.cloud_trace` と対)。
+
+```ts
+import { createLogger } from "ts-gn-log/google/cloud-run";
+import { currentTrace, traceHeaders, withRequestTrace } from "ts-gn-log/google/cloud-trace";
+
+const log = createLogger({ name: "bff" }); // projectId は省略時 GOOGLE_CLOUD_PROJECT
+
+export const POST = withRequestTrace(async (req: Request) => {
+  log.info("received");                       // {"logging.googleapis.com/trace":"projects/<PROJECT_ID>/traces/<TRACE_ID>", ...}
+  await fetch(url, { headers: traceHeaders() }); // 下流に trace を引き継ぐ (traceparent + X-Cloud-Trace-Context)
+  return Response.json({ trace_id: currentTrace()?.traceId }); // 応答 body に載せる trace id は Cloud Trace の trace id
+});
+```
+
+- 受信ヘッダは `traceparent` を優先し、無ければ `X-Cloud-Trace-Context` を見ます (py-gn-log と同じ順)。どちらも無ければ新しい trace id (32 桁の 16 進) を生成するので、包まれた処理の中では `currentTrace()` が常に返ります (生成した trace は `spanId` / `sampled` が不明で、下流には `X-Cloud-Trace-Context` だけを送ります)
+- `logging.googleapis.com/trace` の組み立てにはプロジェクト ID が要ります。`createLogger({ projectId })` か環境変数 `GOOGLE_CLOUD_PROJECT` で指定し、どちらも無ければ trace のフィールドは付きません (既定値を持たない)。その場合でも `currentTrace()` と `traceHeaders()` は動くので、下流への引き継ぎはできます
+- `withRequestTrace` は `runWithContext` で囲むので、その中で `setContext` が使えます。`fields` オプションで、trace とあわせて置くフィールド (リクエストから組み立てる関数でもよい) を渡せます
+- HTTP 以外の経路 (Pub/Sub の属性、タスクのペイロード) では、発行側で `traceHeaders()` の値を属性に載せ、受信側で `traceFromHeaders(attributes)` (名前と値の Record を受けます) で取り出して `runWithTrace(trace, undefined, fn)` で囲みます
+
 ## 環境変数
 
 py-gn-log と同じ名前と意味です。
@@ -114,6 +136,7 @@ py-gn-log と同じ名前と意味です。
 | `LOG_LEVEL` | 出力するレベルの下限。`DEBUG` / `INFO` / `WARN` / `WARNING` / `ERROR` / `CRITICAL` (大文字小文字を問わない) | `INFO`。未知の値も `INFO` に倒す (エラーにしない) |
 | `GNLOG_FORMAT` | 出力形式を明示的に指定する。`json` (Cloud Logging 向けの JSON 行) か `text` (人が読む形式)。それ以外の値は `createLogger()` がエラーを投げる | Cloud Run 上 (`K_SERVICE` などがある) なら `json`、それ以外なら `text` |
 | `K_SERVICE` / `CLOUD_RUN_JOB` / `CLOUD_RUN_WORKER_POOL` | Cloud Run が自動設定する。存在すれば Cloud Run 上と判定する | — |
+| `GOOGLE_CLOUD_PROJECT` | `logging.googleapis.com/trace` (`projects/<PROJECT_ID>/traces/<TRACE_ID>`) の組み立てに使うプロジェクト ID。`createLogger({ projectId })` が優先 | trace のフィールドを付けない (既定値を持たない) |
 
 `createLogger({ level, json })` の引数は環境変数より優先します。`json` を引数で指定した場合は `GNLOG_FORMAT` を読まないので、不正な値があってもエラーになりません。
 
