@@ -114,3 +114,41 @@ describe("ログの呼び出しは例外を投げない (JSON / text)", () => {
     });
   });
 });
+
+describe("復帰行は record の固定キーから組み立て直す (固定キーと同名のフィールド × 直列化不能)", () => {
+  const bad = {
+    toJSON() {
+      throw new Error("nope");
+    },
+  };
+  for (const collide of [
+    "message",
+    "severity",
+    "name",
+    "timestamp",
+    "logging.googleapis.com/labels",
+  ]) {
+    it(`${collide} という名前のフィールドがあっても固定キーは消えない`, () => {
+      const out = collect();
+      const log = createCoreLogger({
+        name: "bff",
+        level: "INFO",
+        format: jsonFormat({ labels: { svc: "x" } }),
+        write: out.write,
+        now: () => FIXED_TIME,
+      });
+      log.error("real", { [collide]: "fake", bad, err: new Error("e") });
+      const entry = JSON.parse(out.lines[0]?.line ?? "null");
+      expect(entry).toMatchObject({
+        severity: "ERROR",
+        message: "real",
+        timestamp: "2026-09-09T01:23:45.678Z",
+        name: "bff",
+        "logging.googleapis.com/labels": { svc: "x" },
+        fields_error: "Error: nope",
+      });
+      expect(entry.stack_trace).toMatch(/^Error: e/);
+      expect(entry).not.toHaveProperty("bad");
+    });
+  }
+});

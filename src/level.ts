@@ -43,8 +43,11 @@ const ALIASES: Record<string, Level> = {
 /**
  * レベルの文字列 (大文字・小文字を問わない) を Level に変換する。
  * 未知の値は `defaultLevel` に倒す (py-gn-log の level.parse と同じ。エラーにしない)。
+ * 文字列以外 (null / 数値 / 配列など。JS からの利用や JSON.parse した設定値) も同じく
+ * `defaultLevel` に倒し、投げない — 外部から来る値の正規化はこの 1 か所で行う。
  */
-export function parseLevel(s: string, defaultLevel: Level = DEFAULT_LEVEL): Level {
+export function parseLevel(s: unknown, defaultLevel: Level = DEFAULT_LEVEL): Level {
+  if (typeof s !== "string") return defaultLevel;
   return ALIASES[s.trim().toUpperCase()] ?? defaultLevel;
 }
 

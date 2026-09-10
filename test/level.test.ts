@@ -53,3 +53,13 @@ describe("levelValue / isEnabled", () => {
     expect(isEnabled("WARNING", "ERROR")).toBe(false);
   });
 });
+
+describe("parseLevel は外部入力の正規化を 1 か所で担う", () => {
+  it("文字列以外 (null / 数値 / 配列 / オブジェクト) は投げずに既定に倒す", () => {
+    expect(parseLevel(null)).toBe("INFO");
+    expect(parseLevel(undefined)).toBe("INFO");
+    expect(parseLevel(20)).toBe("INFO");
+    expect(parseLevel(["ERROR"])).toBe("INFO");
+    expect(parseLevel({ level: "ERROR" }, "ERROR")).toBe("ERROR");
+  });
+});

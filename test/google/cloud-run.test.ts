@@ -116,6 +116,43 @@ describe("createLogger", () => {
     expect(log.level).toBe("INFO");
   });
 
+  it("level に文字列以外 (null / 数値 / 配列) が来ても投げず、INFO に倒す", () => {
+    for (const bogus of [null, 20, ["ERROR"], { level: "ERROR" }]) {
+      const out = collect();
+      const log = createLogger({
+        name: "bff",
+        env: {},
+        level: bogus as unknown as "INFO",
+        json: true,
+        write: out.write,
+      });
+      expect(log.level).toBe("INFO");
+      log.critical("shown");
+      expect(out.lines).toHaveLength(1);
+    }
+  });
+
+  it("fields にオブジェクト以外 (null / 配列 / 文字列) が来ても投げず、無視する", () => {
+    for (const bogus of [null, ["a"], "str", 1]) {
+      const out = collect();
+      const log = createLogger({
+        name: "bff",
+        env: { K_SERVICE: "x" },
+        fields: bogus as unknown as Record<string, unknown>,
+        write: out.write,
+      });
+      log.info("m");
+      const entry = JSON.parse(out.lines[0]?.line ?? "null");
+      expect(Object.keys(entry).sort()).toEqual([
+        "logging.googleapis.com/labels",
+        "message",
+        "name",
+        "severity",
+        "timestamp",
+      ]);
+    }
+  });
+
   it("fields は全行に付き、child でさらに重ねられる", () => {
     const out = collect();
     const log = createLogger({
