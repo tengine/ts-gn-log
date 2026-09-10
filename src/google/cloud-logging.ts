@@ -64,6 +64,10 @@ export function jsonFormat(options: JsonFormatOptions = {}): Formatter {
     if (r.ok) return r.json;
     // 復帰行は record の固定キーから組み立て直す (entry から引き算しない。同名のフィールドが
     // あっても固定キーは消えない)
-    return JSON.stringify({ ...fixedEntry(record), [FIELDS_ERROR_KEY]: r.error });
+    const fallback = tryStringify({ ...fixedEntry(record), [FIELDS_ERROR_KEY]: r.error });
+    if (fallback.ok) return fallback.json;
+    // 固定キー自体 (labels) が直列化できないときは labels も落とす。ここは投げない
+    const { [CLOUD_LOGGING_LABELS_KEY]: _labels, ...withoutLabels } = fixedEntry(record);
+    return JSON.stringify({ ...withoutLabels, [FIELDS_ERROR_KEY]: fallback.error });
   };
 }

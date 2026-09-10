@@ -153,6 +153,35 @@ describe("createLogger", () => {
     }
   });
 
+  it("labels にオブジェクト以外 (null / 配列 / 文字列) が来ても投げず、無視する", () => {
+    for (const bogus of [null, ["a"], "str", 1]) {
+      const out = collect();
+      const log = createLogger({
+        name: "bff",
+        env: { K_SERVICE: "x" },
+        labels: bogus as unknown as Record<string, string>,
+        write: out.write,
+      });
+      log.info("m");
+      expect(JSON.parse(out.lines[0]?.line ?? "null")[CLOUD_LOGGING_LABELS_KEY]).toEqual({});
+    }
+  });
+
+  it("labels の値は文字列にする (Cloud Logging の labels は文字列の map)", () => {
+    const out = collect();
+    const log = createLogger({
+      name: "bff",
+      env: { K_SERVICE: "x" },
+      labels: { n: 1, b: true } as unknown as Record<string, string>,
+      write: out.write,
+    });
+    log.info("m");
+    expect(JSON.parse(out.lines[0]?.line ?? "null")[CLOUD_LOGGING_LABELS_KEY]).toEqual({
+      n: "1",
+      b: "true",
+    });
+  });
+
   it("fields は全行に付き、child でさらに重ねられる", () => {
     const out = collect();
     const log = createLogger({

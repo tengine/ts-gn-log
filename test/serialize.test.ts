@@ -152,3 +152,31 @@ describe("復帰行は record の固定キーから組み立て直す (固定キ
     });
   }
 });
+
+describe("labels 自体が直列化できなくても投げない (直列化不能 × labels)", () => {
+  for (const [label, labels] of [
+    [
+      "投げる toJSON",
+      {
+        toJSON() {
+          throw new Error("labels-boom");
+        },
+      },
+    ],
+    ["循環参照", circular()],
+  ] as const) {
+    it(`${label}: 固定キーは出し、labels を落として fields_error に理由を入れる`, () => {
+      const out = collect();
+      const log = createCoreLogger({
+        name: "bff",
+        level: "INFO",
+        format: jsonFormat({ labels: labels as unknown as Record<string, string> }),
+        write: out.write,
+        now: () => FIXED_TIME,
+      });
+      expect(() => log.info("m", { a: 1 })).not.toThrow();
+      const entry = JSON.parse(out.lines[0]?.line ?? "null");
+      expect(entry).toMatchObject({ severity: "INFO", message: "m", name: "bff" });
+    });
+  }
+});
