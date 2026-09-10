@@ -33,6 +33,25 @@ describe("createCoreLogger", () => {
     expect(seen).toEqual([{ err, fields: { op: "save" } }]);
   });
 
+  it("child({ err }) の err も呼び出し時と同じく LogRecord.err に載り、素のフィールドにならない", () => {
+    const seen: unknown[] = [];
+    const log = createCoreLogger({
+      name: "bff",
+      level: "INFO",
+      format: (r) => {
+        seen.push({ err: r.err, fields: r.fields, has: "err" in r });
+        return "";
+      },
+      write: () => {},
+    });
+    log.child({ err: "fixed", site: "a" }).error("m");
+    log.child({ site: "a" }).info("n");
+    expect(seen).toEqual([
+      { err: "fixed", fields: { site: "a" }, has: true },
+      { err: undefined, fields: { site: "a" }, has: false },
+    ]);
+  });
+
   it("child は固定フィールドを重ね、呼び出し時のフィールドが優先する", () => {
     const seen: Record<string, unknown>[] = [];
     const log = createCoreLogger({

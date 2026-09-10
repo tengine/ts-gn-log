@@ -71,7 +71,7 @@ Cloud Run 上の出力 (1 行の JSON):
 
 - ログの呼び出しは例外を投げません (Python の `logging` と同じ)。フィールドに循環参照や BigInt があっても行は出ます (循環は `"[Circular]"`、BigInt は文字列)。それでも直列化できない値 (投げる `toJSON` など) があるときは、フィールドを落として `fields_error` に理由を入れ、`severity` / `message` などは必ず出します
 - 呼び出し時のフィールドはそのまま JSON のキーになります。キー名は py-gn-log の `extra` と同じく snake_case を推奨します。`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` と同名のフィールドは固定の値が勝ちます
-- `err` だけは特別で、severity が ERROR 以上なら `stack_trace` (Error Reporting が認識するフィールド) に、WARNING 以下なら `error` に、その文字列 (Error なら `stack`) が入ります。`err` は Error でなくても構いません (文字列などはそのまま入り、`message` は変わりません)
+- `err` だけは特別で、severity が ERROR 以上なら `stack_trace` (Error Reporting が認識するフィールド) に、WARNING 以下なら `error` に、その文字列 (Error なら `stack`) が入ります。`err` は Error でなくても構いません (文字列などはそのまま入り、`message` は変わりません)。`child({ err })` の固定フィールドに渡した `err` も同じ扱いです
 - ローカルの text 形式は `2026-09-09T01:23:45.678Z INFO     bff  task accepted  {"site":"site-a"}` の 1 行で、`err` があれば次の行以降に stack が続きます。書式は固定です
 
 ## 環境変数

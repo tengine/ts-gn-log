@@ -74,7 +74,7 @@ export interface Logger {
   warn(message: string, fields?: LogFields): void;
   error(message: string, fields?: LogFields): void;
   critical(message: string, fields?: LogFields): void;
-  /** 固定フィールドを持つ子ロガー。名前・レベル・出力先は親と同じ */
+  /** 固定フィールドを持つ子ロガー。名前・レベル・出力先は親と同じ。`err` を渡せば呼び出し時と同じく特別に扱う */
   child(fields: Record<string, unknown>): Logger;
 }
 
@@ -113,15 +113,18 @@ export function createCoreLogger(options: CoreLoggerOptions): Logger {
   const make = (baseFields: Record<string, unknown>): Logger => {
     const emit = (recordLevel: Level, message: string, fields?: LogFields): void => {
       if (!isEnabled(recordLevel, level)) return;
-      const { err, ...rest } = fields ?? {};
+      // 固定フィールド (child) と呼び出し時のフィールドを合流させてから err を分離する。
+      // child({ err }) で渡した err も同じ扱いにするため
+      const merged: Record<string, unknown> = { ...baseFields, ...(fields ?? {}) };
+      const { err, ...rest } = merged;
       const record: LogRecord = {
         name,
         level: recordLevel,
         message,
         timestamp: now(),
-        fields: { ...baseFields, ...rest },
+        fields: rest,
       };
-      if (fields !== undefined && "err" in fields) record.err = err;
+      if ("err" in merged) record.err = err;
       write(recordLevel, format(record));
     };
     return {
