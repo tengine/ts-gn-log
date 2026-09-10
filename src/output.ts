@@ -153,3 +153,20 @@ export function describeError(err: unknown): string {
     return String(err);
   }
 }
+
+/**
+ * ローカル (Cloud Run 外) 向けの、人が読む text 形式。
+ * `2026-09-09T01:23:45.678Z INFO     bff  message  {"site":"a"}` の 1 行に、`err` があれば
+ * 次の行以降にその文字列 (Error なら stack) を続ける。書式は固定で、py-gn-log の
+ * LOG_FORMAT のような書式文字列は持たない。
+ */
+export const textFormat: Formatter = (record) => {
+  let line = `${record.timestamp.toISOString()} ${record.level.padEnd(8)} ${record.name}  ${record.message}`;
+  if (Object.keys(record.fields).length > 0) {
+    line += `  ${JSON.stringify(record.fields)}`;
+  }
+  if ("err" in record) {
+    line += `\n${describeError(record.err)}`;
+  }
+  return line;
+};
