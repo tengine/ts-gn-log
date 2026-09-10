@@ -6,8 +6,15 @@
  * 文脈を全 await 先まで運べる (Python の ContextVar と同じ位置づけ)。
  *
  * - `runWithContext(values, fn)`: fn の間だけ値を足す (py の `bind`)。抜けると元に戻る。入れ子は内側が勝つ
- * - `setContext(values)` / `clearContext()`: 現在の非同期の流れに残す (py の `set` / `clear`)
+ * - `setContext(values)` / `clearContext()`: いちばん内側の runWithContext の範囲を更新する
+ *   (py の `set` / `clear`)。runWithContext の外では使えない (エラー)
  * - `getContext()`: 現在の文脈
+ *
+ * 実装の要点: runWithContext が可変の入れ物を AsyncLocalStorage.run で張り、setContext /
+ * clearContext はその入れ物を更新する。enterWith は使わない — enterWith は「今の同期実行の
+ * 残り」にしか効かず、コールバックの中で呼ぶと消え、run の外で呼ぶとプロセス全体の既定に
+ * なって無関係なリクエストに漏れるため。入れ物は範囲ごとに別なので、並行する流れや
+ * 別のリクエストに漏れない。
  *
  * キーは JSON 出力のキー名になる。py-gn-log の extra と同じく snake_case を推奨する。
  * 値が null / undefined のキーは出力されない (入れ子で外側の値を一時的に外すのに使える)。
@@ -40,7 +47,23 @@ export const RESERVED_CONTEXT_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 const EMPTY: Context = Object.freeze({});
-const storage = new AsyncLocalStorage<Context>();
+
+/** runWithContext の範囲ごとの入れ物。setContext / clearContext が values を差し替える */
+interface Scope {
+  values: Context;
+}
+
+const storage = new AsyncLocalStorage<Scope>();
+
+function requireScope(fn: string): Scope {
+  const scope = storage.getStore();
+  if (scope === undefined) {
+    throw new Error(
+      `${fn}() must be called inside runWithContext() (Route Handler なら withRequestTrace で囲う)`,
+    );
+  }
+  return scope;
+}
 
 function validateKeys(values: Record<string, unknown>): void {
   const reserved = Object.keys(values)
@@ -55,7 +78,7 @@ function validateKeys(values: Record<string, unknown>): void {
 
 /** 現在の文脈。何も置かれていなければ空 */
 export function getContext(): Context {
-  return storage.getStore() ?? EMPTY;
+  return storage.getStore()?.values ?? EMPTY;
 }
 
 /**
@@ -66,24 +89,30 @@ export function getContext(): Context {
  */
 export function runWithContext<T>(values: Record<string, unknown>, fn: () => T): T {
   validateKeys(values);
-  return storage.run(Object.freeze({ ...getContext(), ...values }), fn);
+  const scope: Scope = { values: Object.freeze({ ...getContext(), ...values }) };
+  return storage.run(scope, fn);
 }
 
 /**
- * 現在の非同期の流れの文脈に値を足す (runWithContext と違い、clearContext するか
- * その流れが終わるまで残る)。リクエストの開始時に置き、終了時に clearContext する使い方。
- * runWithContext の中で呼んだ場合は、その runWithContext の範囲に残る。
+ * いちばん内側の runWithContext の範囲に値を足す。その範囲が終わるまで (await 先、
+ * コールバックの中も含めて) 残り、範囲を抜けると消える。runWithContext の外では使えない。
  *
- * @throws 予約キーを含むとき
+ * @throws 予約キーを含むとき。runWithContext の外で呼んだとき
  */
 export function setContext(values: Record<string, unknown>): void {
   validateKeys(values);
-  storage.enterWith(Object.freeze({ ...getContext(), ...values }));
+  const scope = requireScope("setContext");
+  scope.values = Object.freeze({ ...scope.values, ...values });
 }
 
-/** 現在の非同期の流れの文脈をすべて消す */
+/**
+ * いちばん内側の runWithContext の範囲の文脈をすべて消す。外側の runWithContext の値は、
+ * その範囲に戻れば見える (外側の範囲は消さない)。runWithContext の外では使えない。
+ *
+ * @throws runWithContext の外で呼んだとき
+ */
 export function clearContext(): void {
-  storage.enterWith(EMPTY);
+  requireScope("clearContext").values = EMPTY;
 }
 
 /**

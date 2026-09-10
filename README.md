@@ -87,11 +87,17 @@ await runWithContext({ request_id: "4bf92f35", site: "tokyo" }, async () => {
   await doWork();      // この中のログにも付く
 });
 
-// 現在の非同期の流れに残す (リクエストの開始時に setContext、終了時に clearContext)
-setContext({ request_id: "4bf92f35" });
-log.info("...");
-clearContext();
+// いちばん内側の runWithContext の範囲を更新する (その範囲が終わるまで残る)。
+// リクエストの途中で分かった値 (本文から取り出した ID など) を後から足す使い方
+await runWithContext({}, async () => {
+  const body = await req.json();
+  setContext({ request_id: body.id }); // コールバックや await 先で呼んでも、同じ範囲なので残る
+  log.info("...");
+  clearContext();                        // この範囲の文脈を空にする (外側の範囲は消さない)
+});
 ```
+
+`setContext` / `clearContext` は `runWithContext` の外では使えません (`Error` になります)。Node の `AsyncLocalStorage` には Python の `ContextVar` のような「タスクごとに複製される Context」が無く、範囲の外で置いた値はプロセス全体の既定になって別のリクエストに漏れるため、範囲の中でしか更新できないようにしています。Next.js の Route Handler は `withRequestTrace` (Cloud Trace の節) で囲う前提です。
 
 - キー名は自由ですが、`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` / `stack_trace` / `error` / `fields_error` / `format_error` / `err` は出力の固定キーと同名なので置けません (`Error` になります)。py-gn-log の `extra` と同じく snake_case を推奨します
 - `trace` は予約キーで、出力には混ぜません (`ts-gn-log/trace` と `ts-gn-log/google/cloud-trace` が使います)

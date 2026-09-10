@@ -84,6 +84,67 @@ describe("setContext / clearContext", () => {
     });
     expect(getContext()).toEqual({});
   });
+
+  it("コールバック (setTimeout / then) の中で set しても、同じ範囲なので残る", async () => {
+    await runWithContext({ site: "a" }, async () => {
+      await new Promise<void>((resolve) =>
+        setTimeout(() => {
+          setContext({ from_timer: 1 });
+          resolve();
+        }, 1),
+      );
+      await Promise.resolve().then(() => {
+        setContext({ from_then: 2 });
+      });
+      expect(getContext()).toEqual({ site: "a", from_timer: 1, from_then: 2 });
+    });
+  });
+
+  it("runWithContext の外では使えない (プロセス全体の既定にしない)", () => {
+    expect(() => setContext({ request_id: "x" })).toThrow(/must be called inside runWithContext/);
+    expect(() => clearContext()).toThrow(/must be called inside runWithContext/);
+    expect(getContext()).toEqual({});
+  });
+
+  it("並行する範囲で set しても互いに漏れない", async () => {
+    const results = await Promise.all(
+      ["a", "b"].map((id) =>
+        runWithContext({}, async () => {
+          if (id === "a") setContext({ who: "a" });
+          await tick();
+          return getContext();
+        }),
+      ),
+    );
+    expect(results).toEqual([{ who: "a" }, {}]);
+    expect(getContext()).toEqual({});
+  });
+
+  it("入れ子の内側で clear しても、外側の範囲の値は外側に戻れば見える (内側だけを消す)", async () => {
+    await runWithContext({ o: 1 }, async () => {
+      await runWithContext({ i: 2 }, async () => {
+        clearContext();
+        expect(getContext()).toEqual({});
+        await tick();
+        expect(getContext()).toEqual({});
+      });
+      expect(getContext()).toEqual({ o: 1 });
+    });
+  });
+
+  it("例外で範囲を抜けても、set した値は範囲ごと消えて次の流れに漏れない", async () => {
+    await expect(
+      runWithContext({}, async () => {
+        setContext({ request_id: "A" });
+        await tick();
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    await runWithContext({}, async () => {
+      await tick();
+      expect(getContext()).toEqual({});
+    });
+  });
 });
 
 describe("予約キー", () => {
@@ -98,7 +159,9 @@ describe("予約キー", () => {
       "err",
     ]) {
       expect(() => runWithContext({ [key]: "x" }, () => {})).toThrow(/Context keys conflict/);
-      expect(() => setContext({ [key]: "x" })).toThrow(/Context keys conflict/);
+      runWithContext({}, () => {
+        expect(() => setContext({ [key]: "x" })).toThrow(/Context keys conflict/);
+      });
     }
   });
 
