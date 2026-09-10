@@ -139,6 +139,34 @@ export function createCoreLogger(options: CoreLoggerOptions): Logger {
 }
 
 /**
+ * フィールドを JSON にする。ログの呼び出しは例外を投げない (Python の logging と同じ) ので、
+ * 直列化できない値があっても必ず文字列を返す。
+ *
+ * - BigInt は 10 進の文字列にする
+ * - 循環参照は "[Circular]" に置き換える (祖先に同じオブジェクトがあるときだけ。兄弟で同じ
+ *   オブジェクトを参照しているのは循環ではないのでそのまま出す)
+ * - それでも失敗するとき (toJSON や getter が投げる等) は `ok: false` で理由を返す
+ */
+export function tryStringify(
+  value: unknown,
+): { ok: true; json: string } | { ok: false; error: string } {
+  const ancestors: object[] = [];
+  function replacer(this: unknown, _key: string, v: unknown): unknown {
+    if (typeof v === "bigint") return v.toString();
+    if (typeof v !== "object" || v === null) return v;
+    while (ancestors.length > 0 && ancestors.at(-1) !== this) ancestors.pop();
+    if (ancestors.includes(v)) return "[Circular]";
+    ancestors.push(v);
+    return v;
+  }
+  try {
+    return { ok: true, json: JSON.stringify(value, replacer) ?? "null" };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) };
+  }
+}
+
+/**
  * `err` をログに載せる文字列にする。Error なら stack (無ければ `name: message`)、
  * それ以外 (文字列 / unknown) は文字列にする。`message` は変えない。
  */
@@ -163,7 +191,8 @@ export function describeError(err: unknown): string {
 export const textFormat: Formatter = (record) => {
   let line = `${record.timestamp.toISOString()} ${record.level.padEnd(8)} ${record.name}  ${record.message}`;
   if (Object.keys(record.fields).length > 0) {
-    line += `  ${JSON.stringify(record.fields)}`;
+    const r = tryStringify(record.fields);
+    line += r.ok ? `  ${r.json}` : `  (fields not serializable: ${r.error})`;
   }
   if ("err" in record) {
     line += `\n${describeError(record.err)}`;
