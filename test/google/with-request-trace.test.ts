@@ -110,6 +110,22 @@ describe("withRequestTrace (Route Handler の薄い包み)", () => {
     expect((await regen({ headers: {} }))?.traceId).toMatch(/^[0-9a-f]{32}$/);
   });
 
+  it("newTrace / fields の関数が投げても、ログの都合でリクエストを落とさない", async () => {
+    const h1 = withRequestTrace(async () => currentTrace(), {
+      newTrace: () => {
+        throw new Error("gen");
+      },
+    });
+    expect((await h1({ headers: {} }))?.traceId).toMatch(/^[0-9a-f]{32}$/);
+    const h2 = withRequestTrace(async () => getContext(), {
+      fields: () => {
+        throw new Error("fields");
+      },
+    });
+    const ctx = await h2({ headers: { "x-cloud-trace-context": TID } });
+    expect(Object.keys(ctx)).toEqual(["trace"]);
+  });
+
   it("handler が投げても伝播し、文脈は残らない", async () => {
     const handler = withRequestTrace(async () => {
       throw new Error("boom");
