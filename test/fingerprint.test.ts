@@ -58,19 +58,19 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
     expect(normalizeMessage("abcdef", Number.NaN)).toBe("");
   });
 
-  it("数値に変換できない maxLength は slice と同じく 0 として扱う (JS からの利用や設定値)", () => {
+  it("数値に変換すると NaN になる maxLength は slice と同じく 0 として扱う (JS からの利用や設定値)", () => {
     // 既定値 (300) との違いが出る 400 文字で確かめる (短い入力では偶然一致してしまう)
     const s = "x".repeat(400);
-    for (const n of ["abc", {}, [1, 2], null]) {
+    for (const n of ["abc", {}, [1, 2]]) {
       const value = n as unknown as number;
       expect(normalizeMessage(s, value)).toBe("");
       expect(normalizeMessage(s, value)).toBe(Array.from(s).slice(0, value).join(""));
     }
   });
 
-  it("数値に変換できる maxLength は slice と同じくその数として扱う ('5' や valueOf を持つ値)", () => {
+  it("数値に変換できる maxLength は slice と同じくその数として扱う ('5'、['5']、valueOf を持つ値、null は 0)", () => {
     const s = "x".repeat(400);
-    for (const n of ["5", ["5"], { valueOf: () => 7 }]) {
+    for (const n of ["5", ["5"], { valueOf: () => 7 }, null]) {
       const value = n as unknown as number;
       expect(normalizeMessage(s, value)).toBe(Array.from(s).slice(0, value).join(""));
     }
