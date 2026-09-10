@@ -105,6 +105,17 @@ describe("createLogger", () => {
     expect(out.lines.map((l) => l.line.endsWith("shown"))).toEqual([true]);
   });
 
+  it("level に未知の値が来ても INFO に倒し、ログが全部消えることはない (LOG_LEVEL と同じ)", () => {
+    const out = collect();
+    // JS からの利用や JSON.parse した設定値を模して、型検査をすり抜けた値を渡す
+    const bogus = "TRACE" as unknown as "INFO";
+    const log = createLogger({ name: "bff", env: {}, level: bogus, json: true, write: out.write });
+    log.debug("hidden");
+    log.critical("shown");
+    expect(out.lines.map((l) => JSON.parse(l.line).message)).toEqual(["shown"]);
+    expect(log.level).toBe("INFO");
+  });
+
   it("fields は全行に付き、child でさらに重ねられる", () => {
     const out = collect();
     const log = createLogger({

@@ -4,7 +4,7 @@
  * `isCloudRun()` は Cloud Run (Service / Job / Worker Pool) 上で動いているかを判定する。
  */
 
-import { type Env, type Level, levelFromEnv } from "../level.js";
+import { type Env, type Level, levelFromEnv, parseLevel } from "../level.js";
 import {
   createCoreLogger,
   type Logger,
@@ -46,7 +46,7 @@ export interface CreateLoggerOptions {
   name: string;
   /** 全行の logging.googleapis.com/labels に入れる固定の labels (JSON 形式のみ) */
   labels?: Record<string, string>;
-  /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO */
+  /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO。未知の値は INFO に倒す (LOG_LEVEL と同じ) */
   level?: Level;
   /** true なら JSON、false なら text。省略時は環境変数 GNLOG_FORMAT、無ければ Cloud Run 上なら JSON */
   json?: boolean;
@@ -69,7 +69,8 @@ export interface CreateLoggerOptions {
 export function createLogger(options: CreateLoggerOptions): Logger {
   const env = options.env ?? process.env;
   const json = useJsonOutput(options.json, env);
-  const level = options.level ?? levelFromEnv(env);
+  // 引数も環境変数と同じ検証を通す。TypeScript の型は JS からの利用や JSON.parse した設定値を守らない
+  const level = options.level === undefined ? levelFromEnv(env) : parseLevel(options.level);
   const format = json
     ? jsonFormat(options.labels === undefined ? {} : { labels: options.labels })
     : textFormat;
