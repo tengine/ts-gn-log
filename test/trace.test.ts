@@ -95,15 +95,11 @@ describe("newTraceId / newSpanId", () => {
 describe("runWithTrace / setTrace / currentTrace", () => {
   it("文脈の trace キーに置き、fields も置く。抜けると消える", async () => {
     const trace = { traceId: TID, spanId: SID, sampled: true };
-    await runWithTrace(
-      trace,
-      { "logging.googleapis.com/trace": "projects/p/traces/x" },
-      async () => {
-        expect(currentTrace()).toEqual(trace);
-        expect(getContext()["logging.googleapis.com/trace"]).toBe("projects/p/traces/x");
-        expect(traceHeaders()).toEqual({ traceparent: `00-${TID}-${SID}-01` });
-      },
-    );
+    await runWithTrace(trace, { request_id: "r1" }, async () => {
+      expect(currentTrace()).toEqual(trace);
+      expect(getContext().request_id).toBe("r1");
+      expect(traceHeaders()).toEqual({ traceparent: `00-${TID}-${SID}-01` });
+    });
     expect(currentTrace()).toBeUndefined();
   });
 
