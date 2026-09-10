@@ -58,12 +58,20 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
     expect(normalizeMessage("abcdef", Number.NaN)).toBe("");
   });
 
-  it("数値でない maxLength も slice と同じく 0 として扱う (JS からの利用や設定値)", () => {
-    for (const n of ["abc", {}, [1, 2], null, undefined]) {
+  it("数値でない maxLength は slice と同じく 0 として扱う (JS からの利用や設定値)", () => {
+    // 既定値 (300) との違いが出る 400 文字で確かめる (短い入力では偶然一致してしまう)
+    const s = "x".repeat(400);
+    for (const n of ["abc", {}, [1, 2], null]) {
       const value = n as unknown as number;
-      expect(normalizeMessage("abcdef", value)).toBe(Array.from("abcdef").slice(0, value).join(""));
+      expect(normalizeMessage(s, value)).toBe("");
+      expect(normalizeMessage(s, value)).toBe(Array.from(s).slice(0, value).join(""));
     }
-    expect(normalizeMessage("abcdef", "abc" as unknown as number)).toBe("");
+  });
+
+  it("maxLength を省略する / undefined を渡すと既定の 300 が使われる", () => {
+    const s = "x".repeat(400);
+    expect(normalizeMessage(s)).toHaveLength(300);
+    expect(normalizeMessage(s, undefined)).toHaveLength(300);
   });
 
   it("巨大なメッセージ (10MB) でも配列に展開せず切り詰める", () => {
