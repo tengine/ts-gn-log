@@ -48,9 +48,15 @@ export const RESERVED_CONTEXT_KEYS: ReadonlySet<string> = new Set([
 
 const EMPTY: Context = Object.freeze({});
 
-/** runWithContext の範囲ごとの入れ物。setContext / clearContext が values を差し替える */
+/**
+ * runWithContext の範囲ごとの入れ物。setContext / clearContext が values を差し替える。
+ * closed は範囲 (fn と、fn が返した Promise) が終わった印 — 終わった後に、await し忘れた
+ * 処理から更新されても受け付けない (エラーで知らせる)。読み取り (getContext) は終了後も
+ * 最後の値を返す
+ */
 interface Scope {
   values: Context;
+  closed: boolean;
 }
 
 const storage = new AsyncLocalStorage<Scope>();
@@ -60,6 +66,11 @@ function requireScope(fn: string): Scope {
   if (scope === undefined) {
     throw new Error(
       `${fn}() must be called inside runWithContext() (Route Handler なら withRequestTrace で囲う)`,
+    );
+  }
+  if (scope.closed) {
+    throw new Error(
+      `${fn}() was called after its runWithContext() scope ended (await し忘れた処理からの更新)`,
     );
   }
   return scope;
@@ -89,15 +100,41 @@ export function getContext(): Context {
  */
 export function runWithContext<T>(values: Record<string, unknown>, fn: () => T): T {
   validateKeys(values);
-  const scope: Scope = { values: Object.freeze({ ...getContext(), ...values }) };
-  return storage.run(scope, fn);
+  const scope: Scope = { values: Object.freeze({ ...getContext(), ...values }), closed: false };
+  const close = () => {
+    scope.closed = true;
+  };
+  let result: T;
+  try {
+    result = storage.run(scope, fn);
+  } catch (e) {
+    close();
+    throw e;
+  }
+  if (isPromiseLike(result)) {
+    // 範囲は fn が返した Promise が settle するまで。settle 後の更新は受け付けない
+    result.then(close, close);
+  } else {
+    close();
+  }
+  return result;
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
 }
 
 /**
  * いちばん内側の runWithContext の範囲に値を足す。その範囲が終わるまで (await 先、
  * コールバックの中も含めて) 残り、範囲を抜けると消える。runWithContext の外では使えない。
+ * 範囲が終わった後 (fn が返した Promise の settle 後) に、await し忘れた処理から呼ぶと
+ * エラーになる — 書き込みが誰にも読まれず捨てられるのを知らせるため。
  *
- * @throws 予約キーを含むとき。runWithContext の外で呼んだとき
+ * @throws 予約キーを含むとき。runWithContext の外、または終わった範囲で呼んだとき
  */
 export function setContext(values: Record<string, unknown>): void {
   validateKeys(values);
