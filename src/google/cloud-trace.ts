@@ -21,6 +21,7 @@ import {
   headerValue,
   INVALID_TRACE_ID,
   newTraceId,
+  normalizeTrace,
   runWithTrace,
   setTrace,
   type TraceContext,
@@ -97,11 +98,13 @@ export function logFields(
   projectId: string | undefined,
 ): Record<string, unknown> {
   if (projectId === undefined || projectId === "") return {};
+  const normalized = normalizeTrace(trace);
+  if (normalized === undefined) return {};
   const fields: Record<string, unknown> = {
-    [TRACE_KEY]: `projects/${projectId}/traces/${trace.traceId}`,
+    [TRACE_KEY]: `projects/${projectId}/traces/${normalized.traceId}`,
   };
-  if (trace.spanId !== undefined) fields[SPAN_ID_KEY] = trace.spanId;
-  if (trace.sampled !== undefined) fields[TRACE_SAMPLED_KEY] = trace.sampled;
+  if (normalized.spanId !== undefined) fields[SPAN_ID_KEY] = normalized.spanId;
+  if (normalized.sampled !== undefined) fields[TRACE_SAMPLED_KEY] = normalized.sampled;
   return fields;
 }
 
@@ -113,11 +116,14 @@ export function logFields(
 export function traceHeaders(
   trace: TraceContext | undefined = currentTrace(),
 ): Record<string, string> {
-  if (trace === undefined) return {};
-  const headers = traceparentHeaders(trace);
-  let cloud = trace.traceId;
-  if (trace.spanId !== undefined) cloud += `/${BigInt(`0x${trace.spanId}`).toString(10)}`;
-  if (trace.sampled !== undefined) cloud += `;o=${trace.sampled ? 1 : 0}`;
+  const normalized = normalizeTrace(trace);
+  if (normalized === undefined) return {};
+  const headers = traceparentHeaders(normalized);
+  let cloud = normalized.traceId;
+  if (normalized.spanId !== undefined) {
+    cloud += `/${BigInt(`0x${normalized.spanId}`).toString(10)}`;
+  }
+  if (normalized.sampled !== undefined) cloud += `;o=${normalized.sampled ? 1 : 0}`;
   headers[CLOUD_TRACE_CONTEXT_HEADER] = cloud;
   return headers;
 }
@@ -151,7 +157,9 @@ export function withRequestTrace<Req extends RequestLike, Args extends unknown[]
 ): (request: Req, ...args: Args) => R {
   const generate = options.newTrace ?? (() => ({ traceId: newTraceId() }));
   return (request, ...args) => {
-    const trace = traceFromHeaders(request.headers) ?? generate();
+    // newTrace は利用側の関数なので、その結果も境界で正規化する (不正なら生成し直す)
+    const trace = traceFromHeaders(request.headers) ??
+      normalizeTrace(generate()) ?? { traceId: newTraceId() };
     const fields = typeof options.fields === "function" ? options.fields(request) : options.fields;
     return runWithTrace(trace, fields, () => handler(request, ...args));
   };

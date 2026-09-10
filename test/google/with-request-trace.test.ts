@@ -97,6 +97,19 @@ describe("withRequestTrace (Route Handler の薄い包み)", () => {
     expect(await handler({ headers: { "x-cloud-trace-context": TID } })).toEqual({ traceId: TID });
   });
 
+  it("newTrace が不正な値を返しても投げず、正規化するか生成し直す", async () => {
+    const dropSpan = withRequestTrace(async () => [currentTrace(), traceHeaders()] as const, {
+      newTrace: () => ({ traceId: TID, spanId: "" }),
+    });
+    const [t1, h1] = await dropSpan({ headers: {} });
+    expect(t1).toEqual({ traceId: TID });
+    expect(h1).toEqual({ "X-Cloud-Trace-Context": TID });
+    const regen = withRequestTrace(async () => currentTrace(), {
+      newTrace: () => ({ traceId: "bad" }),
+    });
+    expect((await regen({ headers: {} }))?.traceId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
   it("handler が投げても伝播し、文脈は残らない", async () => {
     const handler = withRequestTrace(async () => {
       throw new Error("boom");

@@ -120,3 +120,46 @@ describe("runWithTrace / setTrace / currentTrace", () => {
     });
   });
 });
+
+describe("normalizeTrace (境界の検証)", () => {
+  it("traceId が 32 桁 16 進でなければ trace 無し。大文字は小文字に", async () => {
+    const { normalizeTrace } = await import("../src/trace.js");
+    expect(normalizeTrace({ traceId: "short" })).toBeUndefined();
+    expect(
+      normalizeTrace({ traceId: TID.toUpperCase(), spanId: SID.toUpperCase(), sampled: true }),
+    ).toEqual({
+      traceId: TID,
+      spanId: SID,
+      sampled: true,
+    });
+    expect(normalizeTrace("x")).toBeUndefined();
+  });
+
+  it("不正な spanId / sampled は落とす", async () => {
+    const { normalizeTrace } = await import("../src/trace.js");
+    expect(normalizeTrace({ traceId: TID, spanId: "", sampled: true })).toEqual({
+      traceId: TID,
+      sampled: true,
+    });
+    expect(normalizeTrace({ traceId: TID, spanId: "not-hex-16chars!" })).toEqual({ traceId: TID });
+    expect(normalizeTrace({ traceId: TID, sampled: "yes" as unknown as boolean })).toEqual({
+      traceId: TID,
+    });
+  });
+
+  it("traceHeaders / runWithTrace / setTrace は不正な値で投げず、正規化して扱う", () => {
+    expect(traceHeaders({ traceId: TID, spanId: "xyz", sampled: true })).toEqual({});
+    expect(traceHeaders({ traceId: "bad" })).toEqual({});
+    runWithTrace({ traceId: TID, spanId: "" }, undefined, () => {
+      expect(currentTrace()).toEqual({ traceId: TID });
+    });
+    runWithTrace({ traceId: "bad" }, { a: 1 }, () => {
+      expect(currentTrace()).toBeUndefined();
+      expect(getContext()).toEqual({});
+    });
+    runWithContext({}, () => {
+      setTrace({ traceId: "bad" });
+      expect(currentTrace()).toBeUndefined();
+    });
+  });
+});

@@ -108,3 +108,13 @@ describe("traceHeaders (送信用)", () => {
     expect(traceFromHeaders(traceHeaders(received))).toEqual(received);
   });
 });
+
+describe("不正な TraceContext は境界で正規化され、投げない", () => {
+  it("traceHeaders (Cloud Run 向け) は不正な spanId を落とし、不正な traceId は空", () => {
+    expect(traceHeaders({ traceId: TID, spanId: "xyz", sampled: true })).toEqual({
+      "X-Cloud-Trace-Context": `${TID};o=1`,
+    });
+    expect(traceHeaders({ traceId: TID, spanId: "" })).toEqual({ "X-Cloud-Trace-Context": TID });
+    expect(traceHeaders({ traceId: "not-a-trace" })).toEqual({});
+  });
+});

@@ -99,8 +99,9 @@ export function traceFromHeaders(headers: HeadersLike): TraceContext | undefined
 export function traceHeaders(
   trace: TraceContext | undefined = currentTrace(),
 ): Record<string, string> {
-  if (trace === undefined) return {};
-  const value = formatTraceparent(trace);
+  const normalized = normalizeTrace(trace);
+  if (normalized === undefined) return {};
+  const value = formatTraceparent(normalized);
   return value === undefined ? {} : { [TRACEPARENT_HEADER]: value };
 }
 
@@ -116,8 +117,7 @@ export function newSpanId(): string {
 
 /** 現在の文脈の trace (無ければ undefined) */
 export function currentTrace(context: Context = getContext()): TraceContext | undefined {
-  const value = context[TRACE_CONTEXT_KEY];
-  return isTraceContext(value) ? value : undefined;
+  return normalizeTrace(context[TRACE_CONTEXT_KEY]);
 }
 
 export function isTraceContext(value: unknown): value is TraceContext {
@@ -126,6 +126,26 @@ export function isTraceContext(value: unknown): value is TraceContext {
     value !== null &&
     typeof (value as { traceId?: unknown }).traceId === "string"
   );
+}
+
+const TRACE_ID_PATTERN = /^[0-9a-f]{32}$/;
+const SPAN_ID_PATTERN = /^[0-9a-f]{16}$/;
+
+/**
+ * 外から来た TraceContext を正規化する (入口の 1 か所で検証し、以降はこの形を信用する)。
+ * traceId が 32 桁の 16 進でなければ undefined (trace 無し)。spanId は 16 桁の 16 進で
+ * なければ落とし、sampled は boolean でなければ落とす。大文字は小文字にする。
+ * 解析 (parseTraceparent / parseCloudTraceContext) の出力は既にこの形。
+ */
+export function normalizeTrace(value: unknown): TraceContext | undefined {
+  if (!isTraceContext(value)) return undefined;
+  const traceId = value.traceId.toLowerCase();
+  if (!TRACE_ID_PATTERN.test(traceId)) return undefined;
+  const trace: TraceContext = { traceId };
+  const spanId = typeof value.spanId === "string" ? value.spanId.toLowerCase() : undefined;
+  if (spanId !== undefined && SPAN_ID_PATTERN.test(spanId)) trace.spanId = spanId;
+  if (typeof value.sampled === "boolean") trace.sampled = value.sampled;
+  return trace;
 }
 
 /**
@@ -137,8 +157,9 @@ export function runWithTrace<T>(
   fields: Record<string, unknown> | undefined,
   fn: () => T,
 ): T {
-  if (trace === undefined) return runWithContext({}, fn);
-  return runWithContext({ ...(fields ?? {}), [TRACE_CONTEXT_KEY]: trace }, fn);
+  const normalized = normalizeTrace(trace);
+  if (normalized === undefined) return runWithContext({}, fn);
+  return runWithContext({ ...(fields ?? {}), [TRACE_CONTEXT_KEY]: normalized }, fn);
 }
 
 /**
@@ -146,6 +167,7 @@ export function runWithTrace<T>(
  * trace が undefined なら何もしない。
  */
 export function setTrace(trace: TraceContext | undefined, fields?: Record<string, unknown>): void {
-  if (trace === undefined) return;
-  setContext({ ...(fields ?? {}), [TRACE_CONTEXT_KEY]: trace });
+  const normalized = normalizeTrace(trace);
+  if (normalized === undefined) return;
+  setContext({ ...(fields ?? {}), [TRACE_CONTEXT_KEY]: normalized });
 }

@@ -36,6 +36,13 @@ describe("logFields", () => {
     expect(logFields({ traceId: TID }, "p")).toEqual({ [TRACE_KEY]: `projects/p/traces/${TID}` });
   });
 
+  it("不正な spanId は落とし、不正な traceId は空", () => {
+    expect(logFields({ traceId: TID, spanId: "not-hex" }, "p")).toEqual({
+      [TRACE_KEY]: `projects/p/traces/${TID}`,
+    });
+    expect(logFields({ traceId: "bad" }, "p")).toEqual({});
+  });
+
   it("projectId が無ければ空 (既定値を持たない)", () => {
     expect(logFields({ traceId: TID, spanId: SID, sampled: true }, undefined)).toEqual({});
     expect(logFields({ traceId: TID }, "")).toEqual({});
