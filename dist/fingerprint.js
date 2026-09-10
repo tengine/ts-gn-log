@@ -34,16 +34,19 @@
  * 揃わない。ts 側は Node の既定に従って U+FFFD に置き換えて値を返す (ログの呼び出しは投げない
  * 方針に合わせる) が、py 側は build_fingerprint が UnicodeEncodeError を投げる。それが
  * Formatter の中で起きるため、error_event を有効にしていると **その ERROR のログ行そのものが
- * 失われる** (error_event 無しなら同じメッセージが出力されるので、fingerprint の機能が行を
- * 落としている)。どちらに揃えるかは py-gn-log 側で決める (未決。py 側の行の欠落は
- * py-gn-log に報告する)。
+ * 失われる**。JSON 形式では error_event を外せば同じメッセージが出力されるが、text 形式では
+ * 出力の段階で同じ例外になり、error_event を外しても行が失われる (どちらも py で実行して
+ * 確認した)。どちらに揃えるかは py-gn-log 側で決める (未決。py 側の行の欠落は py-gn-log に
+ * 報告する)。
  *
- * 入力の大きさ: 置換は入力の全体に走るので、この関数群は入力の大きさに比例したメモリを使う。
- * 数十 MB のメッセージでは Node のヒープを使い切り、catch できない fatal OOM でプロセスが
- * 落ちる (py-gn-log も同じ性質で、Python では MemoryError になる)。**入力の大きさの上限は
- * 呼び出し側の責務**とする — ログの経路では createLogger の errorEvent が上限を超えた
- * メッセージに fingerprint を付けない。直接呼ぶ場合は、呼び出し側でメッセージの長さを
- * 制限すること。
+ * 入力の大きさ: 置換は入力の全体に走るので、この関数群は入力の大きさに比例したメモリを使う
+ * (py-gn-log の fingerprint.py も同じ構造で、3 つの sub を全体にかけてから切り詰める)。
+ * 落ちるかどうかはヒープの大きさと置換でどれだけ膨らむか次第で、実測ではヒープを 512MB に
+ * 制限した環境で 40MB の数値を多く含むメッセージが catch できない fatal OOM になり、既定の
+ * ヒープ (約 4GB) では 40MB は通って 250MB 相当で落ちた。**入力の大きさの上限は呼び出し側の
+ * 責務**とする — PR 7 で createLogger の errorEvent を実装するときに、上限を超えたメッセージ
+ * には fingerprint を付けないようにする (この PR の時点では未実装)。それまでと、直接呼ぶ
+ * 場合は、呼び出し側でメッセージの長さを制限すること。
  */
 import { createHash } from "node:crypto";
 /** 正規化後のメッセージの最大長 (コードポイント数) */
@@ -87,15 +90,19 @@ export function normalizeMessage(message, maxLength = MAX_MESSAGE_LENGTH) {
  * 先頭 maxLength コードポイントに切り詰める (サロゲートペアを分断しない)。
  * 負の maxLength は Python の `s[:negative]` と同じく末尾から削る。
  *
- * 入力を配列に展開しない — 数十 MB のメッセージを `Array.from` に通すとヒープを使い切り、
- * catch できない fatal OOM でプロセスが落ちるため。UTF-16 コード単位の数はコードポイント数
- * 以上なので、まず `s.length` で切り詰めが要るかを判定し、要るときだけ必要な分を走査する。
+ * 切り詰めの段階で入力を配列に展開しない — `Array.from` に通すと、ここでも入力の大きさに
+ * 比例したメモリを使う。UTF-16 コード単位の数はコードポイント数以上なので、まず `s.length` で
+ * 切り詰めが要るかを判定し、要るときだけ必要な分を走査する。置換の段階では依然として入力の
+ * 全体を走るので、モジュールの docstring の「入力の大きさ」の前提は変わらない。
  */
 function truncateCodePoints(s, maxLength) {
     // 非整数は `Array.prototype.slice` と同じ意味論で整数に丸める (NaN は 0)。Python の s[:n] は
     // 非整数で TypeError になるので誤用の範囲だが、丸めずに走査の終了判定に使うと切り詰めが
     // 効かなくなる (入力全体が返る) ため、ここで正規化する
-    const limit = Number.isNaN(maxLength) ? 0 : Math.trunc(maxLength);
+    // Math.trunc を先に通す — Number.isNaN は型を見るので、非数値 ('abc' や {}) を先に
+    // 判定しても false になり、Math.trunc の NaN が残る
+    const truncated = Math.trunc(maxLength);
+    const limit = Number.isNaN(truncated) ? 0 : truncated;
     if (limit >= 0 && s.length <= limit)
         return s;
     let keep = limit;
