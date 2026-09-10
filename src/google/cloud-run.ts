@@ -8,6 +8,8 @@ import { type Env, type Level, levelFromEnv, parseLevel } from "../level.js";
 import {
   createCoreLogger,
   type Logger,
+  lastResortJson,
+  lastResortText,
   textFormat,
   useJsonOutput as useJsonOutputCommon,
   type Writer,
@@ -77,7 +79,12 @@ export function createLogger(options: CreateLoggerOptions): Logger {
   // labels: オブジェクト以外は無視し、値は文字列にする (Cloud Logging の labels は文字列の map)
   const labels = isPlainObject(options.labels) ? stringValues(options.labels) : undefined;
   const format = json ? jsonFormat(labels === undefined ? {} : { labels }) : textFormat;
-  const core: Parameters<typeof createCoreLogger>[0] = { name: options.name, level, format };
+  const core: Parameters<typeof createCoreLogger>[0] = {
+    name: options.name,
+    level,
+    format,
+    lastResort: json ? lastResortJson : lastResortText,
+  };
   if (fields !== undefined) core.fields = fields;
   if (options.write !== undefined) core.write = options.write;
   return createCoreLogger(core);
@@ -87,8 +94,15 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+// 値の文字列化 (toString) が投げる項目は落とす。入口の正規化は投げない
 function stringValues(record: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(record)) out[key] = String(value);
+  for (const [key, value] of Object.entries(record)) {
+    try {
+      out[key] = String(value);
+    } catch {
+      // この項目だけ落とす
+    }
+  }
   return out;
 }
