@@ -1,6 +1,6 @@
 {
   "name": "ts-gn-log",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cloud Run 上の Node.js サーバから Cloud Logging 向けの構造化ログを出すライブラリ (py-gn-log の TypeScript 版)",
   "private": true,
   "type": "module",
@@ -27,9 +27,17 @@
       "types": "./dist/output.d.ts",
       "default": "./dist/output.js"
     },
+    "./trace": {
+      "types": "./dist/trace.d.ts",
+      "default": "./dist/trace.js"
+    },
     "./google/cloud-run": {
       "types": "./dist/google/cloud-run.d.ts",
       "default": "./dist/google/cloud-run.js"
+    },
+    "./google/cloud-trace": {
+      "types": "./dist/google/cloud-trace.d.ts",
+      "default": "./dist/google/cloud-trace.js"
     },
     "./google/cloud-logging": {
       "types": "./dist/google/cloud-logging.d.ts",

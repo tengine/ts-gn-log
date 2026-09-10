@@ -89,7 +89,7 @@ await runWithContext({ trace, site: 'site-a' }, async () => {
 })
 
 // Cloud Trace (py-gn-log #17 と対)
-const trace = traceFromHeaders(request.headers)  // X-Cloud-Trace-Context → 無ければ traceparent → 無ければ新規生成
+const trace = traceFromHeaders(request.headers)  // traceparent → 無ければ X-Cloud-Trace-Context (py-gn-log と同じ順)。無ければ undefined
 const headers = traceHeaders()                     // 現在の文脈から traceparent / X-Cloud-Trace-Context を組み立てる (送信用)
 export const POST = withRequestTrace(async (req) => { ... }) // Next.js Route Handler 用の薄い包み
 ```
@@ -101,7 +101,7 @@ export const POST = withRequestTrace(async (req) => { ... }) // Next.js Route Ha
 - **Cloud Run 判定は `K_SERVICE` / `CLOUD_RUN_JOB` / `CLOUD_RUN_WORKER_POOL` の存在** (py-gn-log と同じ 3 変数、同じ `!= undefined` 判定)
 - **`err` は `Error` でなくてもよい** (Error なら `stack`、文字列 / unknown はその文字列を `stack_trace` に入れる。`message` は変えない。WARNING 以下では `stack_trace` ではなく `error` に入れ、Error Reporting に集計させない)
 - **文脈は AsyncLocalStorage** (`node:async_hooks`)。Next.js の Route Handler は Node の非同期文脈をそのまま通すので、リクエストごとの文脈を全 await 先まで運べる。Python の ContextVar と同じ位置づけ
-- **trace が無いリクエストでは新規に trace id を生成する** (32 hex)。Cloud Run が付ける `X-Cloud-Trace-Context` があればそれを優先。W3C `traceparent` も読む (OpenTelemetry と互換にしておくため。`@opentelemetry/api` 自体には依存しない)
+- **trace が無いリクエストでは `withRequestTrace` が新規に trace id を生成する** (32 hex)。読む順は py-gn-log の main と同じく W3C `traceparent` を優先し、無ければ Cloud Run が付ける `X-Cloud-Trace-Context` (2026-09-10 に py-gn-log #17 の実装に合わせて順を入れ替えた。`traceFromHeaders` 自体は生成せず、無ければ undefined を返す)。`@opentelemetry/api` 自体には依存しない
 - **応答 body に載せる trace id は Cloud Trace の trace id にする** (利用側が応答 body に持つキー名はそのまま、値だけが独自形式から Cloud Trace の id に変わる)。利用者報告の値からログを引く運用は維持できる
 
 ## 4. 実行環境と依存

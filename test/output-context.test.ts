@@ -55,8 +55,8 @@ describe("出力時に文脈のフィールドを混ぜる", () => {
   });
 
   it("文脈の err は置けないので、文脈経由で stack_trace が付くことはない", () => {
-    expect(() => runWithContext({ err: new Error("x") }, () => {})).toThrow(
-      /Context keys conflict/,
-    );
+    // 型では弾かれるので、動的な値を模して渡す (実行時の検査に掛かる)
+    const dynamic: Record<string, unknown> = { err: new Error("x") };
+    expect(() => runWithContext(dynamic, () => {})).toThrow(/Context keys conflict/);
   });
 });

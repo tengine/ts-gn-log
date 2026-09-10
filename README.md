@@ -10,15 +10,15 @@ py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS �
 
 | サブパス | 役割 | 状態 |
 |---|---|---|
-| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `level` / `output` を再輸出 |
+| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `level` / `output` / `trace` を再輸出 |
 | `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 実装済み |
 | `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 未実装 |
 | `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 実装済み |
 | `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し、Logger の核 | 実装済み |
-| `ts-gn-log/trace` | W3C Trace Context (`traceparent`) の解釈・組み立てと、現在の trace の保持 | 未実装 |
+| `ts-gn-log/trace` | W3C Trace Context (`traceparent`) の解釈・組み立てと、現在の trace の保持 | 実装済み |
 | `ts-gn-log/google/cloud-run` | **Cloud Run 向けの入口** `createLogger()` と `isCloudRun()` | 実装済み |
 | `ts-gn-log/google/cloud-logging` | Cloud Logging 向けの JSON 整形 (severity / labels / stack_trace / fingerprint) | 実装済み (fingerprint は未実装) |
-| `ts-gn-log/google/cloud-trace` | `X-Cloud-Trace-Context` の解釈と Cloud Logging の特殊フィールド (`logging.googleapis.com/trace` 等) | 未実装 |
+| `ts-gn-log/google/cloud-trace` | `X-Cloud-Trace-Context` の解釈と Cloud Logging の特殊フィールド (`logging.googleapis.com/trace` 等)、`withRequestTrace` | 実装済み |
 
 ## インストール
 
@@ -54,6 +54,8 @@ const log = createLogger({
   labels: { service: "frontend" },    // logging.googleapis.com/labels (JSON 形式のみ)
   // level: "INFO",                   // 省略時は LOG_LEVEL、無ければ INFO
   // json: true,                      // 省略時は GNLOG_FORMAT、無ければ Cloud Run 上なら JSON
+  // projectId: "my-project",         // logging.googleapis.com/trace の組み立てに使う。省略時は GOOGLE_CLOUD_PROJECT
+  // fields: { app: "bff" },          // 全行に付く固定フィールド (child() の固定フィールドと同じ扱い)
 });
 
 log.info("task accepted", { site: "site-a", operation: "POST /api/v1/things" });
@@ -99,11 +101,33 @@ await runWithContext({}, async () => {
 
 `setContext` / `clearContext` は `runWithContext` の外では使えません (`Error` になります)。`runWithContext` の中で始めて `await` し忘れた処理から、範囲が終わった後に `setContext` した場合は、エラーにはならず、その書き込みは誰にも読まれません (その処理自身のログには、範囲が生きていた頃の文脈が付きます)。文脈の更新は、その範囲を待っている処理の中で行ってください。`runWithContext` は fn が返した Promise をそのまま返し、観測しません — `await` / `catch` しなかった reject は通常どおり unhandled rejection になります。Node の `AsyncLocalStorage` には Python の `ContextVar` のような「タスクごとに複製される Context」が無く、範囲の外で置いた値はプロセス全体の既定になって別のリクエストに漏れるため、範囲の中でしか更新できないようにしています。Next.js の Route Handler は `withRequestTrace` (Cloud Trace の節) で囲う前提です。
 
-- キー名は自由ですが、`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` / `stack_trace` / `error` / `fields_error` / `format_error` / `err` は出力の固定キーと同名なので置けません (`Error` になります)。py-gn-log の `extra` と同じく snake_case を推奨します
+- キー名は自由ですが、`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` / `logging.googleapis.com/trace` / `logging.googleapis.com/spanId` / `logging.googleapis.com/trace_sampled` / `stack_trace` / `error` / `fields_error` / `format_error` / `err` は出力の固定キーと同名なので置けません (`Error` になります)。py-gn-log の `extra` と同じく snake_case を推奨します
 - `trace` は予約キーで、出力には混ぜません (`ts-gn-log/trace` と `ts-gn-log/google/cloud-trace` が使います)
 - 値が `null` / `undefined` のキーは出力されません (入れ子で外側の値を一時的に外すのに使えます)
 - 優先順位は 呼び出し時のフィールド > `child()` の固定フィールド > 文脈 です
 - text 形式でも同じくフィールドとして末尾の JSON に出ます
+
+### Cloud Trace と連携して全ログ行に trace を付ける
+
+Cloud Run はリクエストごとに `X-Cloud-Trace-Context` ヘッダ (と W3C の `traceparent`) を付けます。`ts-gn-log/google/cloud-trace` の `withRequestTrace` で Route Handler を包むと、受信ヘッダの trace を文脈に置き、全ログ行に `logging.googleapis.com/trace` / `spanId` / `trace_sampled` が付いて Cloud Logging でリクエスト単位に紐付きます (py-gn-log の `gnlog.google.cloud_trace` と対)。
+
+```ts
+import { createLogger } from "ts-gn-log/google/cloud-run";
+import { currentTrace, traceHeaders, withRequestTrace } from "ts-gn-log/google/cloud-trace";
+
+const log = createLogger({ name: "bff" }); // projectId は省略時 GOOGLE_CLOUD_PROJECT
+
+export const POST = withRequestTrace(async (req: Request) => {
+  log.info("received");                       // {"logging.googleapis.com/trace":"projects/<PROJECT_ID>/traces/<TRACE_ID>", ...}
+  await fetch(url, { headers: traceHeaders() }); // 下流に trace を引き継ぐ (traceparent + X-Cloud-Trace-Context)
+  return Response.json({ trace_id: currentTrace()?.traceId }); // 応答 body に載せる trace id は Cloud Trace の trace id
+});
+```
+
+- 受信ヘッダは `traceparent` を優先し、無ければ `X-Cloud-Trace-Context` を見ます (py-gn-log と同じ順)。どちらも無ければ新しい trace id (32 桁の 16 進) を生成するので、包まれた処理の中では `currentTrace()` が常に返ります (生成した trace は `spanId` / `sampled` が不明で、下流には `X-Cloud-Trace-Context` だけを送ります)
+- `logging.googleapis.com/trace` の組み立てにはプロジェクト ID が要ります。`createLogger({ projectId })` か環境変数 `GOOGLE_CLOUD_PROJECT` で指定し、どちらも無ければ trace のフィールドは付きません (既定値を持たない)。その場合でも `currentTrace()` と `traceHeaders()` は動くので、下流への引き継ぎはできます
+- `withRequestTrace` は `runWithContext` で囲むので、その中で `setContext` が使えます。`fields` オプションで、trace とあわせて置くフィールド (リクエストから組み立てる関数でもよい) を渡せます。py-gn-log の `cloud_trace.bind(trace, log_fields(...))` と違い、`logging.googleapis.com/trace` などの trace のフィールドは `fields` に渡しません (予約キー `trace` から `jsonFormat` が自動で組みます。渡すと型エラーになります)。`newTrace` / `fields` の関数が投げてもリクエストは落とさず、既定 (生成し直す / fields 無し) に倒します
+- HTTP 以外の経路 (Pub/Sub の属性、タスクのペイロード) では、発行側で `traceHeaders()` の値を属性に載せ、受信側で `traceFromHeaders(attributes)` (名前と値の Record を受けます) で取り出して `runWithTrace(trace, undefined, fn)` で囲みます
 
 ## 環境変数
 
@@ -114,6 +138,7 @@ py-gn-log と同じ名前と意味です。
 | `LOG_LEVEL` | 出力するレベルの下限。`DEBUG` / `INFO` / `WARN` / `WARNING` / `ERROR` / `CRITICAL` (大文字小文字を問わない) | `INFO`。未知の値も `INFO` に倒す (エラーにしない) |
 | `GNLOG_FORMAT` | 出力形式を明示的に指定する。`json` (Cloud Logging 向けの JSON 行) か `text` (人が読む形式)。それ以外の値は `createLogger()` がエラーを投げる | Cloud Run 上 (`K_SERVICE` などがある) なら `json`、それ以外なら `text` |
 | `K_SERVICE` / `CLOUD_RUN_JOB` / `CLOUD_RUN_WORKER_POOL` | Cloud Run が自動設定する。存在すれば Cloud Run 上と判定する | — |
+| `GOOGLE_CLOUD_PROJECT` | `logging.googleapis.com/trace` (`projects/<PROJECT_ID>/traces/<TRACE_ID>`) の組み立てに使うプロジェクト ID。`createLogger({ projectId })` が優先 | trace のフィールドを付けない (既定値を持たない) |
 
 `createLogger({ level, json })` の引数は環境変数より優先します。`json` を引数で指定した場合は `GNLOG_FORMAT` を読まないので、不正な値があってもエラーになりません。
 
