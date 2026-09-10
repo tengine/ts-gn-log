@@ -47,11 +47,11 @@ py-gn-log (`e7119631`) の実出力と、利用プロジェクト A の自前実
 | `stack_trace` | `err.stack` | Error Reporting が認識するフィールド名。py-gn-log PR #9 と同じく ERROR 以上のみ |
 | 任意 (`errorEvent` を有効にしたとき、py-gn-log #18) | `event` (固定名) / `error_type` (未指定 `unknown`) / `operation` (未指定はロガー名) / `fingerprint` | 既定では付けない。利用側が現行の挙動を保ちたいときだけ有効化する |
 
-`fingerprint` の規則は py-gn-log #18 と共有: `sha1(surface | operation | error_type | normalize(message))` の先頭 16 hex。`normalize` は UUID → `<uuid>`、引用文字列 → `<str>`、数値 (`\b\d[\d.,:_-]*`、ASCII 境界) → `<num>`、空白を 1 つに、先頭 300 文字。利用プロジェクト A の TypeScript 実装と Python 実装が今持っている規則そのままで、両言語のゴールデンテストで一致を検証する。
+`fingerprint` の規則は py-gn-log #18 (main にマージ済み) と共有する。正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」と `src/gnlog/fingerprint.py`。要点: (1) UUID → `<uuid>`、引用文字列 → `<str>` (二重引用符、または直前が ASCII 英数字・下線でない単一引用符)、数値 (`\b\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?\b`、ASCII の意味の `\b` / `\d`) → `<num>` の順に置換、(2) 先頭 300 文字に切り詰め、(3) `surface` / `operation` / `error_type` / 正規化したメッセージのそれぞれで `\` → `\\`、`|` → `\|` に escape してから `|` で連結、(4) UTF-8 の SHA-1 の hex 先頭 16 文字。ゴールデンベクタは py-gn-log の tests を正本として複製し、両言語で一致を検証する。「300 文字」の単位 (コードポイントか UTF-16 コード単位か) は py-gn-log #26 で未決で、ts-gn-log の実装時にコードポイント単位で揃える案を #26 に出す。
 
 ### 2.4 py-gn-log 側に変更を求めるもの
 
-- `stack_info: null` が常に付く (python-json-logger の `parse()` に `stack_info` を含めているため)。ts 側では出さないので、py 側で外すか、両方で出すかを決める必要がある → py-gn-log に小さな Issue を足す
+- `stack_info: null` が常に付く (`gnlog.google.cloud_logging.JsonFormatter.parse()` に `stack_info` を含めているため。2026-09-10 の main でも同じ)。ts 側では出さないので、py 側で外すか、両方で出すかを決める必要がある → py-gn-log に小さな Issue を足す (未起票)
 - キー名の snake_case (`error_type` / `trace_id`) は py-gn-log の `extra` の流儀に従う。利用プロジェクト A の現行 camelCase (`traceId` / `errorType`) は ts-gn-log では採らない
 
 ## 3. API 案
@@ -68,7 +68,7 @@ const log = createLogger({
   labels: { service: 'frontend' },        // logging.googleapis.com/labels
   projectId: process.env.GOOGLE_CLOUD_PROJECT, // trace フィールドの組み立てに使う。未指定なら付けない
   level: 'INFO',                           // 省略時は LOG_LEVEL 環境変数、無ければ INFO
-  json: undefined,                         // 省略時は isCloudRun()。true/false で強制 (py-gn-log #13 と対)
+  json: undefined,                         // 省略時は環境変数 GNLOG_FORMAT (json / text)、無ければ isCloudRun()。true/false で強制 (py-gn-log #13 と対)
   errorEvent: { event: 'app_error', surface: 'frontend-bff' }, // 任意。ERROR 以上に分類と fingerprint を付ける (#18)
 })
 
@@ -168,5 +168,10 @@ ts-gn-log/
 
 ## 7. 残る確認
 
-- ライセンス表記 (public にするので `LICENSE` ファイルを置くかどうか。py-gn-log に合わせる)
+- ~~ライセンス表記 (public にするので `LICENSE` ファイルを置くかどうか。py-gn-log に合わせる)~~ → py-gn-log に `LICENSE` が無いので置かない (2026-09-10)
 - py-gn-log 側の `stack_info: null` (§2.4) を外すかどうか
+- fingerprint の「300 文字」の単位 (py-gn-log #26)
+
+## 8. py-gn-log 側の状況 (2026-09-10 追記)
+
+設計時 (`e7119631`) に Issue として参照していた #15 (文脈) / #17 (Cloud Trace) / #18 (分類と fingerprint) は、いずれも py-gn-log の main にマージ済み。#30 で provider 固有の実装が `gnlog.google.*` (`cloud_run` / `cloud_logging` / `cloud_trace`) に再配置され、v0.3.0 に上げる PR (#33) がレビュー中。ts-gn-log が揃える契約の正本は、Issue の議論ではなく **main の実装・README・tests** になった。
