@@ -34,6 +34,23 @@ export function useJsonOutput(json, defaultValue = false, env = process.env) {
     throw new Error(`Invalid value ${JSON.stringify(value)} for environment variable ${GNLOG_FORMAT_ENV_VAR}: ` +
         `expected ${JSON.stringify(GNLOG_FORMAT_JSON)} or ${JSON.stringify(GNLOG_FORMAT_TEXT)}`);
 }
+/** base (複製済みの素のオブジェクト) に extra を重ねる。extra の列挙が投げたら base だけを返す */
+function safeMerge(base, extra) {
+    try {
+        return { ...base, ...(extra ?? {}) };
+    }
+    catch {
+        return { ...base };
+    }
+}
+function safeNow(now) {
+    try {
+        return now();
+    }
+    catch {
+        return new Date();
+    }
+}
 /** どんな値でも投げずに文字列にする */
 export function safeString(value) {
     if (typeof value === "string")
@@ -85,27 +102,23 @@ export function createCoreLogger(options) {
         const emit = (recordLevel, message, fields) => {
             if (!isEnabled(recordLevel, level))
                 return;
-            // 固定フィールド (child) と呼び出し時のフィールドを合流させてから err を分離する。
-            // child({ err }) で渡した err も同じ扱いにするため
-            const merged = { ...baseFields, ...(fields ?? {}) };
-            const { err, ...rest } = merged;
-            const record = {
-                name,
-                level: recordLevel,
-                message,
-                timestamp: now(),
-                fields: rest,
-            };
-            if ("err" in merged)
-                record.err = err;
-            // 「ログの呼び出しは投げない」の保証はここ 1 か所に置く。format が投げても最後の手段の行を
-            // 出し、write が投げても (stdout が閉じている等) 呼び出し元には伝播させない
+            // 「ログの呼び出しは投げない」の保証はここ 1 か所に置く。フィールドの合流 (spread は
+            // 呼び出し元の getter を評価する) から整形までを 1 つの try で囲み、途中で投げても
+            // 最後の手段の行を出す。write が投げても (stdout が閉じている等) 伝播させない
+            let record;
             let line;
             try {
+                // 固定フィールド (child) と呼び出し時のフィールドを合流させてから err を分離する。
+                // child({ err }) で渡した err も同じ扱いにするため
+                const merged = { ...baseFields, ...(fields ?? {}) };
+                const { err, ...rest } = merged;
+                record = { name, level: recordLevel, message, timestamp: now(), fields: rest };
+                if ("err" in merged)
+                    record.err = err;
                 line = format(record);
             }
             catch (e) {
-                line = lastResort(record, e);
+                line = lastResort(record ?? { name, level: recordLevel, message, timestamp: safeNow(now), fields: {} }, e);
             }
             try {
                 write(recordLevel, line);
@@ -122,11 +135,12 @@ export function createCoreLogger(options) {
             warn: (message, fields) => emit("WARNING", message, fields),
             error: (message, fields) => emit("ERROR", message, fields),
             critical: (message, fields) => emit("CRITICAL", message, fields),
-            child: (fields) => make({ ...baseFields, ...fields }),
+            // 入口の spread も投げうる (getter)。投げたら基底フィールドだけで作る
+            child: (fields) => make(safeMerge(baseFields, fields)),
         };
     };
     // child や labels と同じく複製する。渡したオブジェクトを後から書き換えても出力に影響させない
-    return make({ ...(options.fields ?? {}) });
+    return make(safeMerge({}, options.fields));
 }
 /**
  * フィールドを JSON にする。ログの呼び出しは例外を投げない (Python の logging と同じ) ので、

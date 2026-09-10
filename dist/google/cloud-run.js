@@ -67,7 +67,15 @@ function isPlainObject(value) {
 // 値の文字列化 (toString) が投げる項目は落とす。入口の正規化は投げない
 function stringValues(record) {
     const out = {};
-    for (const [key, value] of Object.entries(record)) {
+    let entries;
+    try {
+        // 列挙 (Object.entries) は getter を評価するので投げうる。投げたら labels 無しで続ける
+        entries = Object.entries(record);
+    }
+    catch {
+        return out;
+    }
+    for (const [key, value] of entries) {
         try {
             out[key] = String(value);
         }

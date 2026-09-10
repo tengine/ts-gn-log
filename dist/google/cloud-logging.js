@@ -33,7 +33,14 @@ export const FIELDS_ERROR_KEY = "fields_error";
  * py-gn-log が labels に入れる thread_id / thread_name は、Node にスレッドが無いので付けない。
  */
 export function jsonFormat(options = {}) {
-    const labels = { ...(options.labels ?? {}) };
+    // 複製 (spread) は getter を評価するので投げうる。投げたら labels 無しで続ける
+    let labels;
+    try {
+        labels = { ...(options.labels ?? {}) };
+    }
+    catch {
+        labels = {};
+    }
     // 固定キーだけの行。呼び出し時のフィールドはこれに重ねる (同名なら固定キーが勝つ)
     const fixedEntry = (record) => {
         const entry = {
