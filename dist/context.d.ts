@@ -34,6 +34,8 @@ export declare function getContext(): Context;
 /**
  * fn の間だけ文脈に値を足す。fn が返す Promise が終わるまで (await 先も含めて) 有効で、
  * 抜けると元の文脈に戻る。入れ子にでき、内側の値が同じキーを上書きする。
+ * fn が Promise を返すときは、同じ結果 (値 / 例外) を運ぶ派生の Promise を返す —
+ * 呼び出し元が await / catch しなければ、その reject は通常どおり unhandledRejection になる。
  *
  * @throws 予約キー (固定キーと同名) を含むとき
  */
