@@ -137,3 +137,87 @@ describe("createLogger の入口の正規化は投げない", () => {
     expect(out.lines[0]?.line).toMatch(/INFO {5}bff {2}\[unprintable\] {2}\(format error: /);
   });
 });
+
+describe("オブジェクトの列挙 (spread / Object.entries) が投げても伝播しない", () => {
+  function throwingGetter(): Record<string, unknown> {
+    const o: Record<string, unknown> = { ok: 1 };
+    Object.defineProperty(o, "bad", {
+      enumerable: true,
+      get() {
+        throw new Error("getter");
+      },
+    });
+    return o;
+  }
+
+  it("emit: 呼び出し時のフィールドの getter が投げても最後の手段の行を出す", () => {
+    const out = collect();
+    const log = createCoreLogger({
+      name: "bff",
+      level: "INFO",
+      format: () => "x",
+      write: out.write,
+      now: () => FIXED_TIME,
+    });
+    expect(() => log.info("m", throwingGetter())).not.toThrow();
+    expect(JSON.parse(out.lines[0]?.line ?? "null")).toMatchObject({
+      message: "m",
+      format_error: "Error: getter",
+    });
+  });
+
+  it("child: 固定フィールドの getter が投げても子ロガーは作れ、基底フィールドだけを持つ", () => {
+    const seen: Record<string, unknown>[] = [];
+    const log = createCoreLogger({
+      name: "bff",
+      level: "INFO",
+      format: (r) => {
+        seen.push(r.fields);
+        return "";
+      },
+      write: () => {},
+      fields: { app: "a" },
+    });
+    let child: ReturnType<typeof log.child> | undefined;
+    expect(() => {
+      child = log.child(throwingGetter());
+    }).not.toThrow();
+    child?.info("m");
+    expect(seen).toEqual([{ app: "a" }]);
+  });
+
+  it("createCoreLogger / createLogger: 入口の fields や labels の getter が投げてもロガーは作れる", () => {
+    expect(() =>
+      createCoreLogger({
+        name: "bff",
+        level: "INFO",
+        format: () => "x",
+        write: () => {},
+        fields: throwingGetter(),
+      }),
+    ).not.toThrow();
+    const out = collect();
+    expect(() =>
+      createLogger({
+        name: "bff",
+        env: { K_SERVICE: "x" },
+        labels: throwingGetter() as Record<string, string>,
+        fields: throwingGetter(),
+        write: out.write,
+      }),
+    ).not.toThrow();
+  });
+
+  it("jsonFormat を直接使い labels の getter が投げても、labels 無しで整形できる", () => {
+    const out = collect();
+    const log = createCoreLogger({
+      name: "bff",
+      level: "INFO",
+      format: jsonFormat({ labels: throwingGetter() as Record<string, string> }),
+      write: out.write,
+      now: () => FIXED_TIME,
+    });
+    log.info("m");
+    expect(JSON.parse(out.lines[0]?.line ?? "null")["logging.googleapis.com/labels"]).toEqual({});
+  });
+});

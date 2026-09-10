@@ -96,6 +96,26 @@ export interface CoreLoggerOptions {
   lastResort?: LastResort;
 }
 
+/** base (複製済みの素のオブジェクト) に extra を重ねる。extra の列挙が投げたら base だけを返す */
+function safeMerge(
+  base: Record<string, unknown>,
+  extra: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  try {
+    return { ...base, ...(extra ?? {}) };
+  } catch {
+    return { ...base };
+  }
+}
+
+function safeNow(now: () => Date): Date {
+  try {
+    return now();
+  } catch {
+    return new Date();
+  }
+}
+
 /** 最後の手段の行を組む。record の値は信用せず、safeString で素の文字列にしてから使う */
 export type LastResort = (record: LogRecord, error: unknown) => string;
 
@@ -154,25 +174,24 @@ export function createCoreLogger(options: CoreLoggerOptions): Logger {
   const make = (baseFields: Record<string, unknown>): Logger => {
     const emit = (recordLevel: Level, message: string, fields?: LogFields): void => {
       if (!isEnabled(recordLevel, level)) return;
-      // 固定フィールド (child) と呼び出し時のフィールドを合流させてから err を分離する。
-      // child({ err }) で渡した err も同じ扱いにするため
-      const merged: Record<string, unknown> = { ...baseFields, ...(fields ?? {}) };
-      const { err, ...rest } = merged;
-      const record: LogRecord = {
-        name,
-        level: recordLevel,
-        message,
-        timestamp: now(),
-        fields: rest,
-      };
-      if ("err" in merged) record.err = err;
-      // 「ログの呼び出しは投げない」の保証はここ 1 か所に置く。format が投げても最後の手段の行を
-      // 出し、write が投げても (stdout が閉じている等) 呼び出し元には伝播させない
+      // 「ログの呼び出しは投げない」の保証はここ 1 か所に置く。フィールドの合流 (spread は
+      // 呼び出し元の getter を評価する) から整形までを 1 つの try で囲み、途中で投げても
+      // 最後の手段の行を出す。write が投げても (stdout が閉じている等) 伝播させない
+      let record: LogRecord | undefined;
       let line: string;
       try {
+        // 固定フィールド (child) と呼び出し時のフィールドを合流させてから err を分離する。
+        // child({ err }) で渡した err も同じ扱いにするため
+        const merged: Record<string, unknown> = { ...baseFields, ...(fields ?? {}) };
+        const { err, ...rest } = merged;
+        record = { name, level: recordLevel, message, timestamp: now(), fields: rest };
+        if ("err" in merged) record.err = err;
         line = format(record);
       } catch (e) {
-        line = lastResort(record, e);
+        line = lastResort(
+          record ?? { name, level: recordLevel, message, timestamp: safeNow(now), fields: {} },
+          e,
+        );
       }
       try {
         write(recordLevel, line);
@@ -188,11 +207,12 @@ export function createCoreLogger(options: CoreLoggerOptions): Logger {
       warn: (message, fields) => emit("WARNING", message, fields),
       error: (message, fields) => emit("ERROR", message, fields),
       critical: (message, fields) => emit("CRITICAL", message, fields),
-      child: (fields) => make({ ...baseFields, ...fields }),
+      // 入口の spread も投げうる (getter)。投げたら基底フィールドだけで作る
+      child: (fields) => make(safeMerge(baseFields, fields)),
     };
   };
   // child や labels と同じく複製する。渡したオブジェクトを後から書き換えても出力に影響させない
-  return make({ ...(options.fields ?? {}) });
+  return make(safeMerge({}, options.fields));
 }
 
 /**
