@@ -50,6 +50,26 @@ describe("createCoreLogger", () => {
   });
 });
 
+describe("createCoreLogger の固定フィールド", () => {
+  it("渡したオブジェクトを後から書き換えても出力に影響しない (child / labels と同じ)", () => {
+    const seen: Record<string, unknown>[] = [];
+    const fields: Record<string, unknown> = { app: "x" };
+    const log = createCoreLogger({
+      name: "bff",
+      level: "INFO",
+      format: (r) => {
+        seen.push(r.fields);
+        return "";
+      },
+      write: () => {},
+      fields,
+    });
+    fields.z = 9;
+    log.info("m");
+    expect(seen).toEqual([{ app: "x" }]);
+  });
+});
+
 describe("writeToStdio", () => {
   afterEach(() => vi.restoreAllMocks());
 

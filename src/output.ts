@@ -135,7 +135,8 @@ export function createCoreLogger(options: CoreLoggerOptions): Logger {
       child: (fields) => make({ ...baseFields, ...fields }),
     };
   };
-  return make(options.fields ?? {});
+  // child や labels と同じく複製する。渡したオブジェクトを後から書き換えても出力に影響させない
+  return make({ ...(options.fields ?? {}) });
 }
 
 /**
