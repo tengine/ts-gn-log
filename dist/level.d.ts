@@ -8,6 +8,12 @@ export declare const LEVELS: readonly ["DEBUG", "INFO", "WARNING", "ERROR", "CRI
 /** ログレベルの名前。Cloud Logging の severity としてそのまま出力する */
 export type Level = (typeof LEVELS)[number];
 export declare const DEFAULT_LEVEL: Level;
+/**
+ * 環境変数の入れ物。`process.env` をそのまま渡せる。
+ * `NodeJS.ProcessEnv` を使わないのは、利用側が `@types/node` を型に含めていなくても
+ * この .d.ts が解決できるようにするため。
+ */
+export type Env = Readonly<Record<string, string | undefined>>;
 /** 環境変数の名前 */
 export declare const LOG_LEVEL_ENV_VAR = "LOG_LEVEL";
 /**
@@ -18,7 +24,7 @@ export declare function parseLevel(s: string, defaultLevel?: Level): Level;
 /**
  * 環境変数 LOG_LEVEL からレベルを読む。未設定か空なら INFO、未知の値も INFO。
  */
-export declare function levelFromEnv(env?: NodeJS.ProcessEnv): Level;
+export declare function levelFromEnv(env?: Env): Level;
 /** 比較用の数値 (DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50) */
 export declare function levelValue(level: Level): number;
 /** `level` が `threshold` 以上か (threshold と同じかそれより深刻か) */

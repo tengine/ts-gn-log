@@ -3,6 +3,9 @@
  *
  * `isCloudRun()` は Cloud Run (Service / Job / Worker Pool) 上で動いているかを判定する。
  */
+import { levelFromEnv } from "../level.js";
+import { createCoreLogger, textFormat, useJsonOutput as useJsonOutputCommon, } from "../output.js";
+import { jsonFormat } from "./cloud-logging.js";
 // Cloud Run 上で自動設定される環境変数。いずれかが存在すれば Cloud Run 環境と判定する。
 // - K_SERVICE: Cloud Run Service でのみ自動設定される
 //   https://cloud.google.com/run/docs/container-contract#services-env-vars
@@ -20,9 +23,6 @@ const CLOUD_RUN_ENV_VARS = ["K_SERVICE", "CLOUD_RUN_JOB", "CLOUD_RUN_WORKER_POOL
 export function isCloudRun(env = process.env) {
     return CLOUD_RUN_ENV_VARS.some((name) => env[name] !== undefined);
 }
-import { levelFromEnv } from "../level.js";
-import { createCoreLogger, textFormat, useJsonOutput as useJsonOutputCommon, } from "../output.js";
-import { jsonFormat } from "./cloud-logging.js";
 /**
  * JSON 形式で出力するかを決める (引数 > 環境変数 GNLOG_FORMAT > Cloud Run 上かどうか)。
  * py-gn-log の gnlog.google.cloud_run.use_json_output と対。

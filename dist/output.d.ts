@@ -5,6 +5,7 @@
  * provider ごとのサブパス (`ts-gn-log/google/cloud-run` など) が決め、このモジュールの
  * 関数を組み合わせて入口 (`createLogger()`) を作る。
  */
+import { type Env, type Level } from "./level.js";
 /** 出力形式を明示的に指定する環境変数とその値。未設定なら provider の入口が渡す既定に従う */
 export declare const GNLOG_FORMAT_ENV_VAR = "GNLOG_FORMAT";
 export declare const GNLOG_FORMAT_JSON = "json";
@@ -18,8 +19,7 @@ export declare const GNLOG_FORMAT_TEXT = "text";
  * @throws 環境変数 GNLOG_FORMAT の値が "json" / "text" のいずれでもないとき
  *   (py-gn-log の use_json_output と同じく ValueError 相当のエラー)
  */
-export declare function useJsonOutput(json: boolean | undefined, defaultValue?: boolean | (() => boolean), env?: NodeJS.ProcessEnv): boolean;
-import { type Level } from "./level.js";
+export declare function useJsonOutput(json: boolean | undefined, defaultValue?: boolean | (() => boolean), env?: Env): boolean;
 /** 1 行のログの材料。Formatter が文字列にする */
 export interface LogRecord {
     /** ロガー名 (Cloud Logging の `name`) */

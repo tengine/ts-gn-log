@@ -5,6 +5,7 @@
  * provider ごとのサブパス (`ts-gn-log/google/cloud-run` など) が決め、このモジュールの
  * 関数を組み合わせて入口 (`createLogger()`) を作る。
  */
+import { isEnabled } from "./level.js";
 /** 出力形式を明示的に指定する環境変数とその値。未設定なら provider の入口が渡す既定に従う */
 export const GNLOG_FORMAT_ENV_VAR = "GNLOG_FORMAT";
 export const GNLOG_FORMAT_JSON = "json";
@@ -33,7 +34,6 @@ export function useJsonOutput(json, defaultValue = false, env = process.env) {
     throw new Error(`Invalid value ${JSON.stringify(value)} for environment variable ${GNLOG_FORMAT_ENV_VAR}: ` +
         `expected ${JSON.stringify(GNLOG_FORMAT_JSON)} or ${JSON.stringify(GNLOG_FORMAT_TEXT)}`);
 }
-import { isEnabled } from "./level.js";
 /**
  * severity が ERROR 以上なら stderr、それ以外は stdout に 1 行書く。
  * `console` を経由しない (Next.js の console パッチや色付けの影響を受けないため)。
