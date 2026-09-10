@@ -10,8 +10,8 @@ py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS �
 
 | サブパス | 役割 | 状態 |
 |---|---|---|
-| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `level` / `output` を再輸出 |
-| `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 未実装 |
+| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `level` / `output` を再輸出 |
+| `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 実装済み |
 | `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 未実装 |
 | `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 実装済み |
 | `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し、Logger の核 | 実装済み |
