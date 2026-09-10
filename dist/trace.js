@@ -115,7 +115,9 @@ export function normalizeTrace(value) {
 }
 /**
  * fn の間だけ trace を文脈に置く (py-gn-log の trace.bind と対)。fields はあわせて文脈に置く
- * ログ用のフィールド (provider が組み立てる)。trace が undefined なら fields も置かず fn を呼ぶ。
+ * フィールド。py-gn-log と違い、Cloud Logging の trace のフィールドはここに渡さない
+ * (provider の Formatter が予約キー trace から組む。渡すと型エラー / 予約キーのエラーになる)。
+ * trace が undefined なら fields も置かず fn を呼ぶ。
  */
 export function runWithTrace(trace, fields, fn) {
     const normalized = normalizeTrace(trace);

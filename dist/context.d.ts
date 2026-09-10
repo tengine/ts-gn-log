@@ -25,9 +25,24 @@ export type Context = Readonly<Record<string, unknown>>;
 /** 文脈の `trace` キー。予約されていて出力には混ぜない */
 export declare const TRACE_CONTEXT_KEY = "trace";
 /**
- * 文脈に置けないキー。JSON 出力の固定キーと同名だと、文脈の値が固定の値に消されるか
- * 固定の値を壊すので、置いた時点でエラーにする (py-gn-log が LogRecord の属性名を拒むのと同じ)。
+ * 文脈に置けないキー (JSON 出力の固定キー)。同名だと文脈の値が固定の値に消されるか固定の
+ * 値を壊すので、型で弾き (ContextFields)、型で分からない動的な値は置いた時点でエラーにする
+ * (py-gn-log が LogRecord の属性名を拒むのと同じ)。trace のフィールド
+ * (logging.googleapis.com/trace 等) は文脈の予約キー trace から provider の Formatter が組む
+ * ので、利用側が置く必要は無い。
  */
+export type ReservedContextKey = "severity" | "message" | "timestamp" | "name" | "logging.googleapis.com/labels" | "logging.googleapis.com/trace" | "logging.googleapis.com/spanId" | "logging.googleapis.com/trace_sampled" | "stack_trace" | "error" | "fields_error" | "format_error" | "err";
+/**
+ * 文脈に置くフィールドの型。予約キーをリテラルで書いたり、固定キーを持つ型の値
+ * (`logFields()` の返り値など) を渡したりすると型エラーになる。`Record<string, unknown>` の
+ * ような動的な値は通り、実行時の検査 (RESERVED_CONTEXT_KEYS) に掛かる。
+ */
+export type ContextFields = {
+    [key: string]: unknown;
+} & {
+    [K in ReservedContextKey]?: never;
+};
+/** 実行時の検査に使う予約キーの集合 (ReservedContextKey と同じ内容) */
 export declare const RESERVED_CONTEXT_KEYS: ReadonlySet<string>;
 /** 現在の文脈。何も置かれていなければ空 */
 export declare function getContext(): Context;
@@ -40,14 +55,14 @@ export declare function getContext(): Context;
  *
  * @throws 予約キー (固定キーと同名) を含むとき
  */
-export declare function runWithContext<T>(values: Record<string, unknown>, fn: () => T): T;
+export declare function runWithContext<T>(values: ContextFields, fn: () => T): T;
 /**
  * いちばん内側の runWithContext の範囲に値を足す。その範囲が終わるまで (await 先、
  * コールバックの中も含めて) 残り、範囲を抜けると消える。runWithContext の外では使えない。
  *
  * @throws 予約キーを含むとき。runWithContext の外で呼んだとき
  */
-export declare function setContext(values: Record<string, unknown>): void;
+export declare function setContext(values: ContextFields): void;
 /**
  * いちばん内側の runWithContext の範囲の文脈をすべて消す。外側の runWithContext の値は、
  * その範囲に戻れば見える (外側の範囲は消さない)。runWithContext の外では使えない。

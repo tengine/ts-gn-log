@@ -24,11 +24,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 /** 文脈の `trace` キー。予約されていて出力には混ぜない */
 export const TRACE_CONTEXT_KEY = "trace";
-/**
- * 文脈に置けないキー。JSON 出力の固定キーと同名だと、文脈の値が固定の値に消されるか
- * 固定の値を壊すので、置いた時点でエラーにする (py-gn-log が LogRecord の属性名を拒むのと同じ)。
- */
-export const RESERVED_CONTEXT_KEYS = new Set([
+const RESERVED_LIST = [
     "severity",
     "message",
     "timestamp",
@@ -42,7 +38,9 @@ export const RESERVED_CONTEXT_KEYS = new Set([
     "fields_error",
     "format_error",
     "err",
-]);
+];
+/** 実行時の検査に使う予約キーの集合 (ReservedContextKey と同じ内容) */
+export const RESERVED_CONTEXT_KEYS = new Set(RESERVED_LIST);
 const EMPTY = Object.freeze({});
 const storage = new AsyncLocalStorage();
 function requireScope(fn) {
@@ -57,7 +55,8 @@ function validateKeys(values) {
         .filter((k) => RESERVED_CONTEXT_KEYS.has(k))
         .sort();
     if (reserved.length > 0) {
-        throw new Error(`Context keys conflict with log entry fields: ${JSON.stringify(reserved)}. Choose different key names.`);
+        throw new Error(`Context keys conflict with log entry fields: ${JSON.stringify(reserved)}. Choose different key names ` +
+            "(trace fields such as logging.googleapis.com/trace are derived automatically from the reserved `trace` key).");
     }
 }
 /** 現在の文脈。何も置かれていなければ空 */

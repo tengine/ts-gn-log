@@ -13,6 +13,7 @@
  * - https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
  * - https://cloud.google.com/trace/docs/trace-context
  */
+import type { ContextFields } from "../context.js";
 import type { Env } from "../level.js";
 import { currentTrace, type HeadersLike, runWithTrace, setTrace, type TraceContext } from "../trace.js";
 export { currentTrace, runWithTrace, setTrace };
@@ -39,11 +40,19 @@ export declare function parseCloudTraceContext(value: string | undefined): Trace
 export declare function traceFromHeaders(headers: HeadersLike): TraceContext | undefined;
 /** 環境変数 GOOGLE_CLOUD_PROJECT からプロジェクト ID を取る (未設定か空なら undefined) */
 export declare function projectIdFromEnv(env?: Env): string | undefined;
+/** logFields が組む Cloud Logging の特殊フィールド。文脈の fields には渡せない型 (固定キーを持つ) */
+export interface CloudTraceLogFields {
+    [TRACE_KEY]?: string;
+    [SPAN_ID_KEY]?: string;
+    [TRACE_SAMPLED_KEY]?: boolean;
+}
 /**
  * trace から Cloud Logging の特殊フィールドを組み立てる。projectId が無ければ空
  * (trace のフィールドは付けない — 既定値で本番のプロジェクト ID を持たないため)。
+ * jsonFormat が出力時に使う。py-gn-log の log_fields と違い、runWithTrace / withRequestTrace の
+ * fields には渡さない (渡すと型エラーになる。trace は予約キー trace から自動で組む)。
  */
-export declare function logFields(trace: TraceContext, projectId: string | undefined): Record<string, unknown>;
+export declare function logFields(trace: TraceContext, projectId: string | undefined): CloudTraceLogFields;
 /**
  * 他サービスを呼び出すときに付ける trace のヘッダを組み立てる。trace を省略すると現在の
  * 文脈の trace を使う。traceparent は spanId と sampled の両方が分かっているときだけ、
@@ -55,9 +64,9 @@ export interface RequestLike {
     headers: HeadersLike;
 }
 export interface WithRequestTraceOptions<Req> {
-    /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい */
-    fields?: Record<string, unknown> | ((request: Req) => Record<string, unknown>);
-    /** ヘッダに trace が無いときの新規生成。省略時は traceId だけ (spanId / sampled は不明) */
+    /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい (投げたら fields 無しで続ける) */
+    fields?: ContextFields | ((request: Req) => ContextFields);
+    /** ヘッダに trace が無いときの新規生成。省略時は traceId だけ (spanId / sampled は不明)。不正な値や例外は既定に倒す */
     newTrace?: () => TraceContext;
 }
 /**

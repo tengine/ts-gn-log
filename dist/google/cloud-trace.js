@@ -71,6 +71,8 @@ export function projectIdFromEnv(env = process.env) {
 /**
  * trace から Cloud Logging の特殊フィールドを組み立てる。projectId が無ければ空
  * (trace のフィールドは付けない — 既定値で本番のプロジェクト ID を持たないため)。
+ * jsonFormat が出力時に使う。py-gn-log の log_fields と違い、runWithTrace / withRequestTrace の
+ * fields には渡さない (渡すと型エラーになる。trace は予約キー trace から自動で組む)。
  */
 export function logFields(trace, projectId) {
     if (projectId === undefined || projectId === "")
@@ -120,10 +122,26 @@ export function traceHeaders(trace = currentTrace()) {
 export function withRequestTrace(handler, options = {}) {
     const generate = options.newTrace ?? (() => ({ traceId: newTraceId() }));
     return (request, ...args) => {
-        // newTrace は利用側の関数なので、その結果も境界で正規化する (不正なら生成し直す)
-        const trace = traceFromHeaders(request.headers) ??
-            normalizeTrace(generate()) ?? { traceId: newTraceId() };
-        const fields = typeof options.fields === "function" ? options.fields(request) : options.fields;
+        // newTrace / fields は利用側の関数。ログの都合でリクエストを落とさないよう、境界で
+        // 返り値を正規化し、投げたら既定 (生成し直す / fields 無し) に倒す
+        const trace = traceFromHeaders(request.headers) ?? safeGenerate(generate);
+        const fields = safeFields(options.fields, request);
         return runWithTrace(trace, fields, () => handler(request, ...args));
     };
+}
+function safeGenerate(generate) {
+    try {
+        return normalizeTrace(generate()) ?? { traceId: newTraceId() };
+    }
+    catch {
+        return { traceId: newTraceId() };
+    }
+}
+function safeFields(fields, request) {
+    try {
+        return typeof fields === "function" ? fields(request) : fields;
+    }
+    catch {
+        return undefined;
+    }
 }
