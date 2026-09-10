@@ -25,9 +25,10 @@ export interface JsonFormatOptions {
  * `logging.googleapis.com/labels` を付け、呼び出し時のフィールドをそのまま並べる。
  * これらの固定キーと同名のフィールドは固定キーが勝つ。
  *
- * ログの呼び出しは例外を投げない。フィールドに循環参照や BigInt があっても行を出し
- * (循環は "[Circular]"、BigInt は文字列)、それでも直列化できないときはフィールドを落として
- * `fields_error` に理由を入れ、severity / message などの固定キーは必ず出す。
+ * フィールドに循環参照や BigInt があっても行を出し (循環は "[Circular]"、BigInt は文字列)、
+ * それでも直列化できないときはフィールドを落として `fields_error` に理由を入れ、severity /
+ * message などの固定キーは必ず出す。固定キー自体が直列化できないときは投げる — 「ログの
+ * 呼び出しは投げない」の保証は createCoreLogger の emit が持ち、最後の手段の行を出す。
  *
  * `err` を渡した行は、severity が ERROR 以上なら `stack_trace` (Error Reporting が認識する
  * フィールド。py-gn-log PR #9 と同じく ERROR 以上のみ)、それ未満なら `error` にその文字列を

@@ -34,6 +34,35 @@ export function useJsonOutput(json, defaultValue = false, env = process.env) {
     throw new Error(`Invalid value ${JSON.stringify(value)} for environment variable ${GNLOG_FORMAT_ENV_VAR}: ` +
         `expected ${JSON.stringify(GNLOG_FORMAT_JSON)} or ${JSON.stringify(GNLOG_FORMAT_TEXT)}`);
 }
+/** どんな値でも投げずに文字列にする */
+export function safeString(value) {
+    if (typeof value === "string")
+        return value;
+    try {
+        return String(value);
+    }
+    catch {
+        return "[unprintable]";
+    }
+}
+function safeTimestamp(record) {
+    try {
+        return record.timestamp.toISOString();
+    }
+    catch {
+        return new Date().toISOString();
+    }
+}
+/** 最後の手段 (JSON)。severity / message / name と失敗の理由だけの固定の行。素の文字列しか含まないので投げない */
+export const lastResortJson = (record, error) => JSON.stringify({
+    severity: safeString(record.level),
+    message: safeString(record.message),
+    timestamp: safeTimestamp(record),
+    name: safeString(record.name),
+    format_error: safeString(error instanceof Error ? `${error.name}: ${error.message}` : error),
+});
+/** 最後の手段 (text) */
+export const lastResortText = (record, error) => `${safeTimestamp(record)} ${safeString(record.level).padEnd(8)} ${safeString(record.name)}  ${safeString(record.message)}  (format error: ${safeString(error instanceof Error ? `${error.name}: ${error.message}` : error)})`;
 /**
  * severity が ERROR 以上なら stderr、それ以外は stdout に 1 行書く。
  * `console` を経由しない (Next.js の console パッチや色付けの影響を受けないため)。
@@ -51,6 +80,7 @@ export function createCoreLogger(options) {
     const { name, level, format } = options;
     const write = options.write ?? writeToStdio;
     const now = options.now ?? (() => new Date());
+    const lastResort = options.lastResort ?? lastResortJson;
     const make = (baseFields) => {
         const emit = (recordLevel, message, fields) => {
             if (!isEnabled(recordLevel, level))
@@ -68,7 +98,21 @@ export function createCoreLogger(options) {
             };
             if ("err" in merged)
                 record.err = err;
-            write(recordLevel, format(record));
+            // 「ログの呼び出しは投げない」の保証はここ 1 か所に置く。format が投げても最後の手段の行を
+            // 出し、write が投げても (stdout が閉じている等) 呼び出し元には伝播させない
+            let line;
+            try {
+                line = format(record);
+            }
+            catch (e) {
+                line = lastResort(record, e);
+            }
+            try {
+                write(recordLevel, line);
+            }
+            catch {
+                // Python の logging.Handler.handleError と同じく、呼び出し元には伝播させない
+            }
         };
         return {
             name,

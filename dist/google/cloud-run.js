@@ -4,7 +4,7 @@
  * `isCloudRun()` は Cloud Run (Service / Job / Worker Pool) 上で動いているかを判定する。
  */
 import { levelFromEnv, parseLevel } from "../level.js";
-import { createCoreLogger, textFormat, useJsonOutput as useJsonOutputCommon, } from "../output.js";
+import { createCoreLogger, lastResortJson, lastResortText, textFormat, useJsonOutput as useJsonOutputCommon, } from "../output.js";
 import { jsonFormat } from "./cloud-logging.js";
 // Cloud Run 上で自動設定される環境変数。いずれかが存在すれば Cloud Run 環境と判定する。
 // - K_SERVICE: Cloud Run Service でのみ自動設定される
@@ -49,7 +49,12 @@ export function createLogger(options) {
     // labels: オブジェクト以外は無視し、値は文字列にする (Cloud Logging の labels は文字列の map)
     const labels = isPlainObject(options.labels) ? stringValues(options.labels) : undefined;
     const format = json ? jsonFormat(labels === undefined ? {} : { labels }) : textFormat;
-    const core = { name: options.name, level, format };
+    const core = {
+        name: options.name,
+        level,
+        format,
+        lastResort: json ? lastResortJson : lastResortText,
+    };
     if (fields !== undefined)
         core.fields = fields;
     if (options.write !== undefined)
@@ -59,9 +64,16 @@ export function createLogger(options) {
 function isPlainObject(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+// 値の文字列化 (toString) が投げる項目は落とす。入口の正規化は投げない
 function stringValues(record) {
     const out = {};
-    for (const [key, value] of Object.entries(record))
-        out[key] = String(value);
+    for (const [key, value] of Object.entries(record)) {
+        try {
+            out[key] = String(value);
+        }
+        catch {
+            // この項目だけ落とす
+        }
+    }
     return out;
 }

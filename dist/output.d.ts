@@ -63,7 +63,20 @@ export interface CoreLoggerOptions {
     fields?: Record<string, unknown>;
     /** テスト用。省略時は new Date() */
     now?: () => Date;
+    /**
+     * format か write が例外を投げたときに書く最後の手段の行。省略時は lastResortJson。
+     * 文字列化に依存しない材料だけで組み、投げないことが求められる
+     */
+    lastResort?: LastResort;
 }
+/** 最後の手段の行を組む。record の値は信用せず、safeString で素の文字列にしてから使う */
+export type LastResort = (record: LogRecord, error: unknown) => string;
+/** どんな値でも投げずに文字列にする */
+export declare function safeString(value: unknown): string;
+/** 最後の手段 (JSON)。severity / message / name と失敗の理由だけの固定の行。素の文字列しか含まないので投げない */
+export declare const lastResortJson: LastResort;
+/** 最後の手段 (text) */
+export declare const lastResortText: LastResort;
 /**
  * severity が ERROR 以上なら stderr、それ以外は stdout に 1 行書く。
  * `console` を経由しない (Next.js の console パッチや色付けの影響を受けないため)。
