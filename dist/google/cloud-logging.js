@@ -33,9 +33,9 @@ export const FIELDS_ERROR_KEY = "fields_error";
  */
 export function jsonFormat(options = {}) {
     const labels = { ...(options.labels ?? {}) };
-    return (record) => {
+    // 固定キーだけの行。呼び出し時のフィールドはこれに重ねる (同名なら固定キーが勝つ)
+    const fixedEntry = (record) => {
         const entry = {
-            ...record.fields,
             severity: record.level,
             message: record.message,
             timestamp: record.timestamp.toISOString(),
@@ -46,12 +46,14 @@ export function jsonFormat(options = {}) {
             const key = isEnabled(record.level, "ERROR") ? STACK_TRACE_KEY : ERROR_KEY;
             entry[key] = describeError(record.err);
         }
-        const r = tryStringify(entry);
+        return entry;
+    };
+    return (record) => {
+        const r = tryStringify({ ...record.fields, ...fixedEntry(record) });
         if (r.ok)
             return r.json;
-        const { [FIELDS_ERROR_KEY]: _ignored, ...fixed } = entry;
-        for (const key of Object.keys(record.fields))
-            delete fixed[key];
-        return JSON.stringify({ ...fixed, [FIELDS_ERROR_KEY]: r.error });
+        // 復帰行は record の固定キーから組み立て直す (entry から引き算しない。同名のフィールドが
+        // あっても固定キーは消えない)
+        return JSON.stringify({ ...fixedEntry(record), [FIELDS_ERROR_KEY]: r.error });
     };
 }

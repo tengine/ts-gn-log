@@ -19,8 +19,10 @@ export declare const LOG_LEVEL_ENV_VAR = "LOG_LEVEL";
 /**
  * レベルの文字列 (大文字・小文字を問わない) を Level に変換する。
  * 未知の値は `defaultLevel` に倒す (py-gn-log の level.parse と同じ。エラーにしない)。
+ * 文字列以外 (null / 数値 / 配列など。JS からの利用や JSON.parse した設定値) も同じく
+ * `defaultLevel` に倒し、投げない — 外部から来る値の正規化はこの 1 か所で行う。
  */
-export declare function parseLevel(s: string, defaultLevel?: Level): Level;
+export declare function parseLevel(s: unknown, defaultLevel?: Level): Level;
 /**
  * 環境変数 LOG_LEVEL からレベルを読む。未設定か空なら INFO、未知の値も INFO。
  */

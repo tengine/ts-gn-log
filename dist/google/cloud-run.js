@@ -41,15 +41,21 @@ export function useJsonOutput(json, env = process.env) {
 export function createLogger(options) {
     const env = options.env ?? process.env;
     const json = useJsonOutput(options.json, env);
-    // 引数も環境変数と同じ検証を通す。TypeScript の型は JS からの利用や JSON.parse した設定値を守らない
+    // 外から来る値はここで正規化する。TypeScript の型は JS からの利用や JSON.parse した設定値を守らない。
+    // level: 未指定なら LOG_LEVEL、未知の文字列や文字列以外は INFO (parseLevel が 1 か所で倒す)
     const level = options.level === undefined ? levelFromEnv(env) : parseLevel(options.level);
+    // fields: オブジェクト以外 (null / 配列 / 文字列) は無視する
+    const fields = isPlainObject(options.fields) ? options.fields : undefined;
     const format = json
         ? jsonFormat(options.labels === undefined ? {} : { labels: options.labels })
         : textFormat;
     const core = { name: options.name, level, format };
-    if (options.fields !== undefined)
-        core.fields = options.fields;
+    if (fields !== undefined)
+        core.fields = fields;
     if (options.write !== undefined)
         core.write = options.write;
     return createCoreLogger(core);
+}
+function isPlainObject(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
