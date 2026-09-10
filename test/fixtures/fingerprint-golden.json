@@ -116,6 +116,53 @@
       "expected": "a1 1a _1 1_ -<num> +<num> <num>-<num>"
     }
   ],
+  "normalize_max_length": [
+    {
+      "message": "order 123 not found",
+      "max_length": -1,
+      "expected": "order <num> not foun"
+    },
+    {
+      "message": "order 123 not found",
+      "max_length": -5,
+      "expected": "order <num> not "
+    },
+    {
+      "message": "order 123 not found",
+      "max_length": 0,
+      "expected": ""
+    },
+    {
+      "message": "order 123 not found",
+      "max_length": 3,
+      "expected": "ord"
+    },
+    {
+      "message": "order 123 not found",
+      "max_length": 1000,
+      "expected": "order <num> not found"
+    },
+    {
+      "message": "xxxxx😀😀😀😀😀",
+      "max_length": -3,
+      "expected": "xxxxx😀😀"
+    },
+    {
+      "message": "😀😀😀😀😀",
+      "max_length": -5,
+      "expected": ""
+    },
+    {
+      "message": "😀😀😀😀😀",
+      "max_length": -10,
+      "expected": ""
+    },
+    {
+      "message": "日本語のメッセージ 12 件",
+      "max_length": -4,
+      "expected": "日本語のメッセージ <nu"
+    }
+  ],
   "fingerprint": [
     {
       "surface": "worker",

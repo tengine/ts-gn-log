@@ -25,6 +25,21 @@ NORMALIZE_CASES = [
     "'cause it failed", "unbalanced 'quote here", "tab\tand\nnewline 'a\nb' end",
     "1e5 and 1,23 and 1.2.3 and 0x1F and v2", "a1 1a _1 1_ -1 +1 1-2",
 ]
+# max_length を振った事例。負の値と 0 の扱いを両言語で突き合わせるための軸
+# (Python のスライス s[:negative] は末尾から削る。非整数は Python では TypeError に
+#  なるので契約の対象にせず、ts 側だけのテストで扱う)
+NORMALIZE_MAX_LENGTH_CASES = [
+    ("order 123 not found", -1),
+    ("order 123 not found", -5),
+    ("order 123 not found", 0),
+    ("order 123 not found", 3),
+    ("order 123 not found", 1000),
+    # BMP 外の文字を含む負の切り詰め — 末尾から削る単位もコードポイント
+    ("x" * 5 + "😀" * 5, -3),
+    ("😀" * 5, -5),
+    ("😀" * 5, -10),
+    ("日本語のメッセージ 12 件", -4),
+]
 FINGERPRINT_CASES = [
     ("worker", "orders.create", "validation", "order 1 missing"),
     ("worker", "orders.create", "validation", "order 2 missing"),
@@ -51,6 +66,10 @@ out = {
     "truncation_unit": "code points (py-gn-log #26 案 1)",
     "max_message_length": 300,
     "normalize": [{"message": m, "expected": normalize_message(m)} for m in NORMALIZE_CASES],
+    "normalize_max_length": [
+        {"message": m, "max_length": n, "expected": normalize_message(m, n)}
+        for m, n in NORMALIZE_MAX_LENGTH_CASES
+    ],
     "fingerprint": [
         {"surface": s, "operation": o, "error_type": e, "message": m, "expected": build_fingerprint(s, o, e, m)}
         for s, o, e, m in FINGERPRINT_CASES

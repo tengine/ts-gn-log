@@ -150,7 +150,7 @@ buildFingerprint("worker", "orders.create", "validation", "order 123 missing");
 
 **入力の大きさの上限は呼び出し側の責務です。** 置換は入力の全体に走るので、`normalizeMessage` / `buildFingerprint` は入力の大きさに比例したメモリを使います (py-gn-log の `fingerprint.py` も同じ構造で、3 つの `sub` を全体にかけてから切り詰めます。上限をどこの責務にするかは py-gn-log #35 で未決です)。落ちるかどうかはヒープの大きさと、置換でどれだけ膨らむか次第です — 実測では、ヒープを 512MB に制限した環境で 40MB の数値を多く含むメッセージが `try`/`catch` で受けられない fatal OOM になり、既定のヒープ (約 4GB) では 40MB は通って 250MB 相当で落ちました。ログの経路では、PR 7 で `createLogger` の `errorEvent` を実装するときに上限を超えたメッセージへ fingerprint を付けないようにします (**この PR の時点では未実装**)。それまでと、これらの関数を直接呼ぶ場合は、呼び出し側でメッセージの長さを制限してください。
 
-両言語で同じ値になることは、py-gn-log の Python 実装から生成したゴールデンベクタ (`test/fixtures/fingerprint-golden.json`) で検証しています。規則を変えたときは py-gn-log の環境で再生成します:
+両言語で同じ値になることは、py-gn-log の Python 実装から生成したゴールデンベクタ (`test/fixtures/fingerprint-golden.json`) で検証しています。正規化、`maxLength` を振った切り詰め (負の値と 0 を含む)、fingerprint の 3 つの軸を持ちます。規則を変えたときは py-gn-log の環境で再生成します:
 
 ```
 cd ../py-gn-log && uv run python ../ts-gn-log/test/fixtures/generate-fingerprint-golden.py "$(git rev-parse --short HEAD)" > ../ts-gn-log/test/fixtures/fingerprint-golden.json
@@ -205,6 +205,10 @@ npm ci
 | `npm run test:cov` | カバレッジ付きでテストを実行する |
 | `npm run lint` | Biome で lint と書式を検査する |
 | `npm run format` | Biome で書式を整える |
+
+### 文書とテストの題に書く断定
+
+規則の正本は [CLAUDE.md](CLAUDE.md) の「文書とテストの題に書く断定」です。要点は、断定はリポジトリの関門で検査できるものに限り、py-gn-log の挙動そのものは断定せず参照にし、テストの題は列挙した事例が属する分類だけを名指す、の 3 つです。
 
 ### `dist/` をコミットする規律
 

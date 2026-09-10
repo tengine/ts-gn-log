@@ -43,7 +43,7 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
     expect(normalizeMessage("abc", 10)).toBe("abc");
   });
 
-  it("負の maxLength は末尾から削る (Python の s[:negative] と同じ)", () => {
+  it("負の maxLength は末尾から削る (Python の s[:negative] と同じ。ゴールデンベクタでも照合)", () => {
     expect(normalizeMessage("abcdef", -2)).toBe("abcd");
     expect(normalizeMessage("abcdef", -1)).toBe("abcde");
     expect(normalizeMessage("a😀b😀c", -2)).toBe("a😀b");

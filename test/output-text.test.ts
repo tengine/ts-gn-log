@@ -36,11 +36,20 @@ describe("textFormat (ローカル向け)", () => {
     expect(last()).toBe('2026-09-09T01:23:45.678Z INFO     bff  m  {"site":"a","n":1}');
   });
 
-  it("err があれば次の行以降に stack を続ける (レベルを問わない)", () => {
+  it("err があれば次の行以降に stack を続ける (5 つのレベルすべて)", () => {
     const { log, last } = makeLogger();
     const err = new Error("boom");
-    log.warn("retrying", { err });
-    expect(last()).toBe(`2026-09-09T01:23:45.678Z WARNING  bff  retrying\n${err.stack}`);
+    const severities = {
+      debug: "DEBUG   ",
+      info: "INFO    ",
+      warn: "WARNING ",
+      error: "ERROR   ",
+      critical: "CRITICAL",
+    } as const;
+    for (const [method, severity] of Object.entries(severities)) {
+      log[method as keyof typeof severities]("m", { err });
+      expect(last()).toBe(`2026-09-09T01:23:45.678Z ${severity} bff  m\n${err.stack}`);
+    }
     log.error("failed", { err: "plain" });
     expect(last()).toBe("2026-09-09T01:23:45.678Z ERROR    bff  failed\nplain");
   });

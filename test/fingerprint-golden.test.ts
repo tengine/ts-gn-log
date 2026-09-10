@@ -8,6 +8,7 @@ interface Golden {
   truncation_unit: string;
   max_message_length: number;
   normalize: Array<{ message: string; expected: string }>;
+  normalize_max_length: Array<{ message: string; max_length: number; expected: string }>;
   fingerprint: Array<{
     surface: string;
     operation: string;
@@ -35,6 +36,14 @@ describe(`fingerprint のゴールデンベクタ (py-gn-log ${golden.source.com
       expect(normalizeMessage(c.message)).toBe(c.expected);
     },
   );
+
+  it.each(
+    golden.normalize_max_length.map(
+      (c) => [`${c.message.slice(0, 20)} @ ${c.max_length}`, c] as const,
+    ),
+  )("normalize (max_length を指定) %j", (_label, c) => {
+    expect(normalizeMessage(c.message, c.max_length)).toBe(c.expected);
+  });
 
   it.each(
     golden.fingerprint.map(

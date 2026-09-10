@@ -9,7 +9,7 @@ describe("isCloudRun", () => {
     expect(isCloudRun({ CLOUD_RUN_WORKER_POOL: "worker" })).toBe(true);
   });
 
-  it("値が空文字列でも、存在すれば真 (py-gn-log の != None と同じ判定)", () => {
+  it("値が空文字列でも、存在すれば真 (py-gn-log の os.getenv(name) is not None と同じ判定)", () => {
     expect(isCloudRun({ K_SERVICE: "" })).toBe(true);
   });
 
@@ -132,7 +132,7 @@ describe("createLogger", () => {
     }
   });
 
-  it("fields にオブジェクト以外 (null / 配列 / 文字列) が来ても投げず、無視する", () => {
+  it("fields にプレーンなオブジェクト以外 (null / 配列 / 文字列 / 数値) が来ても投げず、無視する", () => {
     for (const bogus of [null, ["a"], "str", 1]) {
       const out = collect();
       const log = createLogger({
@@ -153,7 +153,7 @@ describe("createLogger", () => {
     }
   });
 
-  it("labels にオブジェクト以外 (null / 配列 / 文字列) が来ても投げず、無視する", () => {
+  it("labels にプレーンなオブジェクト以外 (null / 配列 / 文字列 / 数値) が来ても投げず、無視する", () => {
     for (const bogus of [null, ["a"], "str", 1]) {
       const out = collect();
       const log = createLogger({
