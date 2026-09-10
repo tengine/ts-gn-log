@@ -14,6 +14,7 @@
  * - https://cloud.google.com/trace/docs/trace-context
  */
 
+import type { ContextFields } from "../context.js";
 import type { Env } from "../level.js";
 import {
   currentTrace,
@@ -89,18 +90,24 @@ export function projectIdFromEnv(env: Env = process.env): string | undefined {
   return value === undefined || value === "" ? undefined : value;
 }
 
+/** logFields が組む Cloud Logging の特殊フィールド。文脈の fields には渡せない型 (固定キーを持つ) */
+export interface CloudTraceLogFields {
+  [TRACE_KEY]?: string;
+  [SPAN_ID_KEY]?: string;
+  [TRACE_SAMPLED_KEY]?: boolean;
+}
+
 /**
  * trace から Cloud Logging の特殊フィールドを組み立てる。projectId が無ければ空
  * (trace のフィールドは付けない — 既定値で本番のプロジェクト ID を持たないため)。
+ * jsonFormat が出力時に使う。py-gn-log の log_fields と違い、runWithTrace / withRequestTrace の
+ * fields には渡さない (渡すと型エラーになる。trace は予約キー trace から自動で組む)。
  */
-export function logFields(
-  trace: TraceContext,
-  projectId: string | undefined,
-): Record<string, unknown> {
+export function logFields(trace: TraceContext, projectId: string | undefined): CloudTraceLogFields {
   if (projectId === undefined || projectId === "") return {};
   const normalized = normalizeTrace(trace);
   if (normalized === undefined) return {};
-  const fields: Record<string, unknown> = {
+  const fields: CloudTraceLogFields = {
     [TRACE_KEY]: `projects/${projectId}/traces/${normalized.traceId}`,
   };
   if (normalized.spanId !== undefined) fields[SPAN_ID_KEY] = normalized.spanId;
@@ -135,7 +142,7 @@ export interface RequestLike {
 
 export interface WithRequestTraceOptions<Req> {
   /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい */
-  fields?: Record<string, unknown> | ((request: Req) => Record<string, unknown>);
+  fields?: ContextFields | ((request: Req) => ContextFields);
   /** ヘッダに trace が無いときの新規生成。省略時は traceId だけ (spanId / sampled は不明) */
   newTrace?: () => TraceContext;
 }

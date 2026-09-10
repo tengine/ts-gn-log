@@ -12,6 +12,7 @@
 import { randomBytes } from "node:crypto";
 import {
   type Context,
+  type ContextFields,
   getContext,
   runWithContext,
   setContext,
@@ -150,11 +151,13 @@ export function normalizeTrace(value: unknown): TraceContext | undefined {
 
 /**
  * fn の間だけ trace を文脈に置く (py-gn-log の trace.bind と対)。fields はあわせて文脈に置く
- * ログ用のフィールド (provider が組み立てる)。trace が undefined なら fields も置かず fn を呼ぶ。
+ * フィールド。py-gn-log と違い、Cloud Logging の trace のフィールドはここに渡さない
+ * (provider の Formatter が予約キー trace から組む。渡すと型エラー / 予約キーのエラーになる)。
+ * trace が undefined なら fields も置かず fn を呼ぶ。
  */
 export function runWithTrace<T>(
   trace: TraceContext | undefined,
-  fields: Record<string, unknown> | undefined,
+  fields: ContextFields | undefined,
   fn: () => T,
 ): T {
   const normalized = normalizeTrace(trace);
@@ -166,7 +169,7 @@ export function runWithTrace<T>(
  * いちばん内側の runWithContext の範囲に trace を置く (py-gn-log の trace.set と対)。
  * trace が undefined なら何もしない。
  */
-export function setTrace(trace: TraceContext | undefined, fields?: Record<string, unknown>): void {
+export function setTrace(trace: TraceContext | undefined, fields?: ContextFields): void {
   const normalized = normalizeTrace(trace);
   if (normalized === undefined) return;
   setContext({ ...(fields ?? {}), [TRACE_CONTEXT_KEY]: normalized });

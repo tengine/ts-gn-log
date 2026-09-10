@@ -30,10 +30,35 @@ export type Context = Readonly<Record<string, unknown>>;
 export const TRACE_CONTEXT_KEY = "trace";
 
 /**
- * 文脈に置けないキー。JSON 出力の固定キーと同名だと、文脈の値が固定の値に消されるか
- * 固定の値を壊すので、置いた時点でエラーにする (py-gn-log が LogRecord の属性名を拒むのと同じ)。
+ * 文脈に置けないキー (JSON 出力の固定キー)。同名だと文脈の値が固定の値に消されるか固定の
+ * 値を壊すので、型で弾き (ContextFields)、型で分からない動的な値は置いた時点でエラーにする
+ * (py-gn-log が LogRecord の属性名を拒むのと同じ)。trace のフィールド
+ * (logging.googleapis.com/trace 等) は文脈の予約キー trace から provider の Formatter が組む
+ * ので、利用側が置く必要は無い。
  */
-export const RESERVED_CONTEXT_KEYS: ReadonlySet<string> = new Set([
+export type ReservedContextKey =
+  | "severity"
+  | "message"
+  | "timestamp"
+  | "name"
+  | "logging.googleapis.com/labels"
+  | "logging.googleapis.com/trace"
+  | "logging.googleapis.com/spanId"
+  | "logging.googleapis.com/trace_sampled"
+  | "stack_trace"
+  | "error"
+  | "fields_error"
+  | "format_error"
+  | "err";
+
+/**
+ * 文脈に置くフィールドの型。予約キーをリテラルで書いたり、固定キーを持つ型の値
+ * (`logFields()` の返り値など) を渡したりすると型エラーになる。`Record<string, unknown>` の
+ * ような動的な値は通り、実行時の検査 (RESERVED_CONTEXT_KEYS) に掛かる。
+ */
+export type ContextFields = { [key: string]: unknown } & { [K in ReservedContextKey]?: never };
+
+const RESERVED_LIST: readonly ReservedContextKey[] = [
   "severity",
   "message",
   "timestamp",
@@ -47,7 +72,10 @@ export const RESERVED_CONTEXT_KEYS: ReadonlySet<string> = new Set([
   "fields_error",
   "format_error",
   "err",
-]);
+];
+
+/** 実行時の検査に使う予約キーの集合 (ReservedContextKey と同じ内容) */
+export const RESERVED_CONTEXT_KEYS: ReadonlySet<string> = new Set(RESERVED_LIST);
 
 const EMPTY: Context = Object.freeze({});
 
@@ -74,7 +102,8 @@ function validateKeys(values: Record<string, unknown>): void {
     .sort();
   if (reserved.length > 0) {
     throw new Error(
-      `Context keys conflict with log entry fields: ${JSON.stringify(reserved)}. Choose different key names.`,
+      `Context keys conflict with log entry fields: ${JSON.stringify(reserved)}. Choose different key names ` +
+        "(trace fields such as logging.googleapis.com/trace are derived automatically from the reserved `trace` key).",
     );
   }
 }
@@ -93,7 +122,7 @@ export function getContext(): Context {
  *
  * @throws 予約キー (固定キーと同名) を含むとき
  */
-export function runWithContext<T>(values: Record<string, unknown>, fn: () => T): T {
+export function runWithContext<T>(values: ContextFields, fn: () => T): T {
   validateKeys(values);
   const scope: Scope = { values: Object.freeze({ ...getContext(), ...values }) };
   return storage.run(scope, fn);
@@ -105,7 +134,7 @@ export function runWithContext<T>(values: Record<string, unknown>, fn: () => T):
  *
  * @throws 予約キーを含むとき。runWithContext の外で呼んだとき
  */
-export function setContext(values: Record<string, unknown>): void {
+export function setContext(values: ContextFields): void {
   validateKeys(values);
   const scope = requireScope("setContext");
   scope.values = Object.freeze({ ...scope.values, ...values });

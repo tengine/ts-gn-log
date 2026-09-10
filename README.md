@@ -124,7 +124,7 @@ export const POST = withRequestTrace(async (req: Request) => {
 
 - 受信ヘッダは `traceparent` を優先し、無ければ `X-Cloud-Trace-Context` を見ます (py-gn-log と同じ順)。どちらも無ければ新しい trace id (32 桁の 16 進) を生成するので、包まれた処理の中では `currentTrace()` が常に返ります (生成した trace は `spanId` / `sampled` が不明で、下流には `X-Cloud-Trace-Context` だけを送ります)
 - `logging.googleapis.com/trace` の組み立てにはプロジェクト ID が要ります。`createLogger({ projectId })` か環境変数 `GOOGLE_CLOUD_PROJECT` で指定し、どちらも無ければ trace のフィールドは付きません (既定値を持たない)。その場合でも `currentTrace()` と `traceHeaders()` は動くので、下流への引き継ぎはできます
-- `withRequestTrace` は `runWithContext` で囲むので、その中で `setContext` が使えます。`fields` オプションで、trace とあわせて置くフィールド (リクエストから組み立てる関数でもよい) を渡せます
+- `withRequestTrace` は `runWithContext` で囲むので、その中で `setContext` が使えます。`fields` オプションで、trace とあわせて置くフィールド (リクエストから組み立てる関数でもよい) を渡せます。py-gn-log の `cloud_trace.bind(trace, log_fields(...))` と違い、`logging.googleapis.com/trace` などの trace のフィールドは `fields` に渡しません (予約キー `trace` から `jsonFormat` が自動で組みます。渡すと型エラーになります)
 - HTTP 以外の経路 (Pub/Sub の属性、タスクのペイロード) では、発行側で `traceHeaders()` の値を属性に載せ、受信側で `traceFromHeaders(attributes)` (名前と値の Record を受けます) で取り出して `runWithTrace(trace, undefined, fn)` で囲みます
 
 ## 環境変数
