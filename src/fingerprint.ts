@@ -96,19 +96,23 @@ export function normalizeMessage(message: string, maxLength: number = MAX_MESSAG
  * 以上なので、まず `s.length` で切り詰めが要るかを判定し、要るときだけ必要な分を走査する。
  */
 function truncateCodePoints(s: string, maxLength: number): string {
-  if (maxLength >= 0 && s.length <= maxLength) return s;
-  let keep = maxLength;
-  if (maxLength < 0) {
+  // 非整数は `Array.prototype.slice` と同じ意味論で整数に丸める (NaN は 0)。Python の s[:n] は
+  // 非整数で TypeError になるので誤用の範囲だが、丸めずに走査の終了判定に使うと切り詰めが
+  // 効かなくなる (入力全体が返る) ため、ここで正規化する
+  const limit = Number.isNaN(maxLength) ? 0 : Math.trunc(maxLength);
+  if (limit >= 0 && s.length <= limit) return s;
+  let keep = limit;
+  if (limit < 0) {
     // 末尾から削るには全体のコードポイント数が要る。数え上げも配列を作らずに行う
     let total = 0;
     for (const _ch of s) total += 1;
-    keep = total + maxLength;
+    keep = total + limit;
   }
   if (keep <= 0) return "";
   let out = "";
   let count = 0;
   for (const ch of s) {
-    if (count === keep) break;
+    if (count >= keep) break;
     out += ch;
     count += 1;
   }

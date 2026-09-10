@@ -50,6 +50,14 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
     expect(normalizeMessage("ab", -5)).toBe("");
   });
 
+  it("非整数の maxLength は Array.prototype.slice と同じく整数に丸める (NaN は 0)", () => {
+    for (const n of [2.5, -2.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(normalizeMessage("abcdef", n)).toBe(Array.from("abcdef").slice(0, n).join(""));
+    }
+    expect(normalizeMessage("abcdef", 2.5)).toBe("ab");
+    expect(normalizeMessage("abcdef", Number.NaN)).toBe("");
+  });
+
   it("巨大なメッセージ (10MB) でも配列に展開せず切り詰める", () => {
     const big = "x".repeat(10 * 1024 * 1024);
     expect(Array.from(normalizeMessage(big))).toHaveLength(300);
