@@ -116,10 +116,21 @@ function validateKeys(values: Record<string, unknown>): void {
  */
 export function normalizeContextFields(value: unknown): ContextFields | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  let keys: string[];
+  try {
+    keys = Object.keys(value);
+  } catch {
+    return undefined; // ownKeys が投げる Proxy など
+  }
   const out: Record<string, unknown> = {};
-  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+  for (const key of keys) {
     if (RESERVED_CONTEXT_KEYS.has(key)) continue;
-    out[key] = v;
+    // getter はキーごとに読む。投げる getter はそのキーだけ落とす (Object.entries だと全部を一度に評価する)
+    try {
+      out[key] = (value as Record<string, unknown>)[key];
+    } catch {
+      // このキーだけ落とす
+    }
   }
   return out as ContextFields;
 }

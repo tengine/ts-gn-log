@@ -138,6 +138,35 @@ describe("withRequestTrace (Route Handler の薄い包み)", () => {
     expect(Object.keys(await h2({ headers: {} }))).toEqual(["trace"]);
   });
 
+  it("headers が無い / get が投げる / 値の toString が投げる、でもリクエストを落とさない", async () => {
+    const h = withRequestTrace(async () => currentTrace()?.traceId);
+    expect(await h({} as unknown as { headers: Headers })).toMatch(/^[0-9a-f]{32}$/);
+    const throwingGet = {
+      get() {
+        throw new Error("get");
+      },
+    };
+    expect(await h({ headers: throwingGet })).toMatch(/^[0-9a-f]{32}$/);
+    const evil = {
+      toString() {
+        throw new Error("ts");
+      },
+    };
+    expect(await h({ headers: { traceparent: evil } })).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("fields の返り値に投げる getter と正常なキーが同居しても、正常なキーは残る", async () => {
+    const o: Record<string, unknown> = { ok: 1 };
+    Object.defineProperty(o, "bad", {
+      enumerable: true,
+      get() {
+        throw new Error("getter");
+      },
+    });
+    const h = withRequestTrace(async () => getContext(), { fields: () => o });
+    expect(await h({ headers: {} })).toMatchObject({ ok: 1 });
+  });
+
   it("handler が投げても伝播し、文脈は残らない", async () => {
     const handler = withRequestTrace(async () => {
       throw new Error("boom");

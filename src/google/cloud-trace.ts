@@ -164,10 +164,18 @@ export function withRequestTrace<Req extends RequestLike, Args extends unknown[]
 ): (request: Req, ...args: Args) => R {
   const generate = options.newTrace ?? (() => ({ traceId: newTraceId() }));
   return (request, ...args) => {
-    // newTrace / fields は利用側の関数。ログの都合でリクエストを落とさないよう、境界で
-    // 返り値を正規化し、投げたら既定 (生成し直す / fields 無し) に倒す
-    const trace = traceFromHeaders(request.headers) ?? safeGenerate(generate);
-    const fields = safeFields(options.fields, request);
+    // handler を呼ぶ前の処理 (headers → trace → fields) 全体を 1 つの境界にする。ログの都合で
+    // リクエストを落とさないよう、どこで投げても「生成した trace + fields 無し」に倒す。
+    // 個々の防御 (safeGenerate / safeFields) は残すが、保証の置き場はこの try 1 か所
+    let trace: TraceContext;
+    let fields: ContextFields | undefined;
+    try {
+      trace = traceFromHeaders(request.headers) ?? safeGenerate(generate);
+      fields = safeFields(options.fields, request);
+    } catch {
+      trace = { traceId: newTraceId() };
+      fields = undefined;
+    }
     return runWithTrace(trace, fields, () => handler(request, ...args));
   };
 }
