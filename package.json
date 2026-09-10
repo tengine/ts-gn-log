@@ -27,9 +27,17 @@
       "types": "./dist/output.d.ts",
       "default": "./dist/output.js"
     },
+    "./trace": {
+      "types": "./dist/trace.d.ts",
+      "default": "./dist/trace.js"
+    },
     "./google/cloud-run": {
       "types": "./dist/google/cloud-run.d.ts",
       "default": "./dist/google/cloud-run.js"
+    },
+    "./google/cloud-trace": {
+      "types": "./dist/google/cloud-trace.d.ts",
+      "default": "./dist/google/cloud-trace.js"
     },
     "./google/cloud-logging": {
       "types": "./dist/google/cloud-logging.d.ts",
