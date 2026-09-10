@@ -1,0 +1,205 @@
+{
+  "source": {
+    "repo": "tengine/py-gn-log",
+    "commit": "1968f3b",
+    "generator": "test/fixtures/generate-fingerprint-golden.py (run with py-gn-log's uv environment)"
+  },
+  "truncation_unit": "code points (py-gn-log #26 案 1)",
+  "max_message_length": 300,
+  "normalize": [
+    {
+      "message": "order 123 not found",
+      "expected": "order <num> not found"
+    },
+    {
+      "message": "ratio 0.75 exceeded",
+      "expected": "ratio <num> exceeded"
+    },
+    {
+      "message": "user \"alice\" missing",
+      "expected": "user <str> missing"
+    },
+    {
+      "message": "user 'bob' missing",
+      "expected": "user <str> missing"
+    },
+    {
+      "message": "id 3f2504e0-4f89-11d3-9a0c-0305e82c3301 gone",
+      "expected": "id <uuid> gone"
+    },
+    {
+      "message": "id 3F2504E0-4F89-11D3-9A0C-0305E82C3301 gone",
+      "expected": "id <uuid> gone"
+    },
+    {
+      "message": "code \"E123\"",
+      "expected": "code <str>"
+    },
+    {
+      "message": "table t1 locked",
+      "expected": "table t1 locked"
+    },
+    {
+      "message": "no variable parts",
+      "expected": "no variable parts"
+    },
+    {
+      "message": "can't connect to database, won't retry",
+      "expected": "can't connect to database, won't retry"
+    },
+    {
+      "message": "user 'bob' can't login",
+      "expected": "user <str> can't login"
+    },
+    {
+      "message": "it's 'quoted'.",
+      "expected": "it's <str>."
+    },
+    {
+      "message": "user 'bob's account is locked",
+      "expected": "user <str>s account is locked"
+    },
+    {
+      "message": "count 1,234 rows",
+      "expected": "count <num> rows"
+    },
+    {
+      "message": "count 9,876,543 rows",
+      "expected": "count <num> rows"
+    },
+    {
+      "message": "timeout after 1.5e10 ns",
+      "expected": "timeout after <num> ns"
+    },
+    {
+      "message": "tolerance 2E-3 exceeded",
+      "expected": "tolerance <num> exceeded"
+    },
+    {
+      "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "message": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 12345",
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa <"
+    },
+    {
+      "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+    },
+    {
+      "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀😀😀😀😀",
+      "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀"
+    },
+    {
+      "message": "日本語のメッセージ 12 件 'テスト'",
+      "expected": "日本語のメッセージ <num> 件 <str>"
+    },
+    {
+      "message": "'cause it failed",
+      "expected": "'cause it failed"
+    },
+    {
+      "message": "unbalanced 'quote here",
+      "expected": "unbalanced 'quote here"
+    },
+    {
+      "message": "tab\tand\nnewline 'a\nb' end",
+      "expected": "tab\tand\nnewline 'a\nb' end"
+    },
+    {
+      "message": "1e5 and 1,23 and 1.2.3 and 0x1F and v2",
+      "expected": "<num> and <num>,<num> and <num>.<num> and 0x1F and v2"
+    },
+    {
+      "message": "a1 1a _1 1_ -1 +1 1-2",
+      "expected": "a1 1a _1 1_ -<num> +<num> <num>-<num>"
+    }
+  ],
+  "fingerprint": [
+    {
+      "surface": "worker",
+      "operation": "orders.create",
+      "error_type": "validation",
+      "message": "order 1 missing",
+      "expected": "69a75e4781a25df7"
+    },
+    {
+      "surface": "worker",
+      "operation": "orders.create",
+      "error_type": "validation",
+      "message": "order 2 missing",
+      "expected": "69a75e4781a25df7"
+    },
+    {
+      "surface": "w",
+      "operation": "op",
+      "error_type": "validation",
+      "message": "rejected 1,234 rows",
+      "expected": "053829ee92fe2f4a"
+    },
+    {
+      "surface": "w",
+      "operation": "op",
+      "error_type": "infra",
+      "message": "can't connect to database, won't retry",
+      "expected": "b31f7949efc444ef"
+    },
+    {
+      "surface": "worker|orders",
+      "operation": "create",
+      "error_type": "validation",
+      "message": "boom",
+      "expected": "f41a87474989db0f"
+    },
+    {
+      "surface": "worker",
+      "operation": "orders|create",
+      "error_type": "validation",
+      "message": "boom",
+      "expected": "cef51290d2ac4ef0"
+    },
+    {
+      "surface": "worker|orders",
+      "operation": "create",
+      "error_type": "validation",
+      "message": "a\\b",
+      "expected": "49078efb240744f4"
+    },
+    {
+      "surface": "",
+      "operation": "orders.create",
+      "error_type": "validation",
+      "message": "surface empty",
+      "expected": "d85bf1b3c8285655"
+    },
+    {
+      "surface": "worker",
+      "operation": "orders.create",
+      "error_type": "validation",
+      "message": "order 123 for \"alice\" not found (id=3f2504e0-4f89-11d3-9a0c-0305e82c3301)",
+      "expected": "fc2673ac3981f22c"
+    },
+    {
+      "surface": "日本",
+      "operation": "注文.作成",
+      "error_type": "検証",
+      "message": "注文 123 が 'ユーザ' に見つかりません 😀",
+      "expected": "8702ce0c9bea7296"
+    },
+    {
+      "surface": "w",
+      "operation": "op",
+      "error_type": "t",
+      "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "expected": "e40a06bc9f8c4348"
+    },
+    {
+      "surface": "w",
+      "operation": "op",
+      "error_type": "t",
+      "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀😀😀😀😀|tail",
+      "expected": "4ec878393cd60c07"
+    }
+  ]
+}
