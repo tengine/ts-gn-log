@@ -48,15 +48,9 @@ export const RESERVED_CONTEXT_KEYS: ReadonlySet<string> = new Set([
 
 const EMPTY: Context = Object.freeze({});
 
-/**
- * runWithContext の範囲ごとの入れ物。setContext / clearContext が values を差し替える。
- * closed は範囲 (fn と、fn が返した Promise) が終わった印 — 終わった後に、await し忘れた
- * 処理から更新されても受け付けない (エラーで知らせる)。読み取り (getContext) は終了後も
- * 最後の値を返す
- */
+/** runWithContext の範囲ごとの入れ物。setContext / clearContext が values を差し替える */
 interface Scope {
   values: Context;
-  closed: boolean;
 }
 
 const storage = new AsyncLocalStorage<Scope>();
@@ -66,11 +60,6 @@ function requireScope(fn: string): Scope {
   if (scope === undefined) {
     throw new Error(
       `${fn}() must be called inside runWithContext() (Route Handler なら withRequestTrace で囲う)`,
-    );
-  }
-  if (scope.closed) {
-    throw new Error(
-      `${fn}() was called after its runWithContext() scope ended (await し忘れた処理からの更新)`,
     );
   }
   return scope;
@@ -95,59 +84,23 @@ export function getContext(): Context {
 /**
  * fn の間だけ文脈に値を足す。fn が返す Promise が終わるまで (await 先も含めて) 有効で、
  * 抜けると元の文脈に戻る。入れ子にでき、内側の値が同じキーを上書きする。
- * fn が Promise を返すときは、同じ結果 (値 / 例外) を運ぶ派生の Promise を返す —
- * 呼び出し元が await / catch しなければ、その reject は通常どおり unhandledRejection になる。
+ * fn の戻り値はそのまま返し、Promise を観測しない (then を付けると呼び出し元が握らなかった
+ * reject を処理済みにしてしまい、派生を返すと二重に報告されるため)。範囲の中で始めて
+ * await し忘れた処理からの setContext は、範囲の終了後は誰にも読まれない (誤用の範囲)。
  *
  * @throws 予約キー (固定キーと同名) を含むとき
  */
 export function runWithContext<T>(values: Record<string, unknown>, fn: () => T): T {
   validateKeys(values);
-  const scope: Scope = { values: Object.freeze({ ...getContext(), ...values }), closed: false };
-  const close = () => {
-    scope.closed = true;
-  };
-  let result: T;
-  try {
-    result = storage.run(scope, fn);
-  } catch (e) {
-    close();
-    throw e;
-  }
-  if (isPromiseLike(result)) {
-    // 範囲は fn が返した Promise が settle するまで。後付けの then で観測すると、そのハンドラが
-    // 呼び出し元の握らなかった reject を「処理済み」にして unhandledRejection を握り潰すので、
-    // 観測ではなく「閉じてから同じ結果を返す派生の Promise」を返す。呼び出し元が派生を
-    // 握らなければ、派生が unhandledRejection として報告される
-    return Promise.resolve(result).then(
-      (value) => {
-        close();
-        return value;
-      },
-      (error: unknown) => {
-        close();
-        throw error;
-      },
-    ) as unknown as T;
-  }
-  close();
-  return result;
-}
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { then?: unknown }).then === "function"
-  );
+  const scope: Scope = { values: Object.freeze({ ...getContext(), ...values }) };
+  return storage.run(scope, fn);
 }
 
 /**
  * いちばん内側の runWithContext の範囲に値を足す。その範囲が終わるまで (await 先、
  * コールバックの中も含めて) 残り、範囲を抜けると消える。runWithContext の外では使えない。
- * 範囲が終わった後 (fn が返した Promise の settle 後) に、await し忘れた処理から呼ぶと
- * エラーになる — 書き込みが誰にも読まれず捨てられるのを知らせるため。
  *
- * @throws 予約キーを含むとき。runWithContext の外、または終わった範囲で呼んだとき
+ * @throws 予約キーを含むとき。runWithContext の外で呼んだとき
  */
 export function setContext(values: Record<string, unknown>): void {
   validateKeys(values);

@@ -132,31 +132,22 @@ describe("setContext / clearContext", () => {
     });
   });
 
-  it("範囲が終わった後 (await し忘れた処理から) の set / clear はエラーで知らせる", async () => {
+  it("await し忘れた処理から範囲の終了後に set しても、投げず、誰にも読まれない (誤用の範囲)", async () => {
     let late: Promise<unknown> | undefined;
     await runWithContext({ a: 1 }, async () => {
-      // await し忘れた投げ放しの処理。範囲の中で始まるので Scope を掴んでいる
       late = (async () => {
         await tick();
         await tick();
-        const before = getContext();
-        let error: unknown;
-        try {
-          setContext({ z: 9 });
-        } catch (e) {
-          error = e;
-        }
-        return { before, error, after: getContext() };
+        setContext({ z: 9 });
+        return getContext();
       })();
     });
-    const r = (await late) as { before: unknown; error: unknown; after: unknown };
-    // 読み取りは最後の値を返すが、更新は受け付けない
-    expect(r.before).toEqual({ a: 1 });
-    expect(String(r.error)).toMatch(/after its runWithContext\(\) scope ended/);
-    expect(r.after).toEqual({ a: 1 });
+    expect(getContext()).toEqual({});
+    expect(await late).toEqual({ a: 1, z: 9 });
+    expect(getContext()).toEqual({});
   });
 
-  it("await しない fn の reject は握り潰されず、unhandledRejection として届く", async () => {
+  it("await しない fn の reject は握り潰されず、unhandledRejection として届く (Promise を観測しない)", async () => {
     const caught = new Promise<unknown>((resolve) => {
       const handler = (reason: unknown) => {
         process.off("unhandledRejection", handler);
@@ -176,30 +167,22 @@ describe("setContext / clearContext", () => {
     expect(String(reason)).toMatch(/uncaught-boom/);
   });
 
-  it("await した場合は同じ値 / 同じエラーが返り、settle 後に範囲が閉じる", async () => {
-    await expect(runWithContext({}, async () => 42)).resolves.toBe(42);
-    const err = new Error("e");
-    await expect(
-      runWithContext({}, async () => {
-        throw err;
-      }),
-    ).rejects.toBe(err);
-  });
-
-  it("同期の fn は戻った時点で範囲が終わり、そこから逃げたマイクロタスクの更新もエラー", async () => {
-    const seen = new Promise<unknown>((resolve) => {
-      runWithContext({}, () => {
-        queueMicrotask(() => {
-          try {
-            setContext({ z: 1 });
-            resolve("no error");
-          } catch (e) {
-            resolve(e);
-          }
-        });
-      });
-    });
-    expect(String(await seen)).toMatch(/scope ended/);
+  it("元の Promise を呼び出し元が握っていれば二重に報告されない (戻り値は fn の Promise そのもの)", async () => {
+    let fired = false;
+    const handler = () => {
+      fired = true;
+    };
+    process.on("unhandledRejection", handler);
+    const own = (async () => {
+      throw new Error("K-err");
+    })();
+    own.catch(() => {});
+    const returned = runWithContext({}, () => own);
+    expect(returned).toBe(own);
+    await tick();
+    await tick();
+    process.off("unhandledRejection", handler);
+    expect(fired).toBe(false);
   });
 
   it("例外で範囲を抜けても、set した値は範囲ごと消えて次の流れに漏れない", async () => {

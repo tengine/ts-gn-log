@@ -97,7 +97,7 @@ await runWithContext({}, async () => {
 });
 ```
 
-`setContext` / `clearContext` は `runWithContext` の外では使えません (`Error` になります)。範囲が終わった後 (fn が返した Promise が settle した後) に、`await` し忘れた処理から呼んだ場合も `Error` になります (書き込みが捨てられるのを知らせるため。読み取りは最後の値を返します)。Node の `AsyncLocalStorage` には Python の `ContextVar` のような「タスクごとに複製される Context」が無く、範囲の外で置いた値はプロセス全体の既定になって別のリクエストに漏れるため、範囲の中でしか更新できないようにしています。Next.js の Route Handler は `withRequestTrace` (Cloud Trace の節) で囲う前提です。
+`setContext` / `clearContext` は `runWithContext` の外では使えません (`Error` になります)。`runWithContext` の中で始めて `await` し忘れた処理から、範囲が終わった後に `setContext` した場合は、エラーにはならず、その書き込みは誰にも読まれません (その処理自身のログには、範囲が生きていた頃の文脈が付きます)。文脈の更新は、その範囲を待っている処理の中で行ってください。`runWithContext` は fn が返した Promise をそのまま返し、観測しません — `await` / `catch` しなかった reject は通常どおり unhandled rejection になります。Node の `AsyncLocalStorage` には Python の `ContextVar` のような「タスクごとに複製される Context」が無く、範囲の外で置いた値はプロセス全体の既定になって別のリクエストに漏れるため、範囲の中でしか更新できないようにしています。Next.js の Route Handler は `withRequestTrace` (Cloud Trace の節) で囲う前提です。
 
 - キー名は自由ですが、`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` / `stack_trace` / `error` / `fields_error` / `format_error` / `err` は出力の固定キーと同名なので置けません (`Error` になります)。py-gn-log の `extra` と同じく snake_case を推奨します
 - `trace` は予約キーで、出力には混ぜません (`ts-gn-log/trace` と `ts-gn-log/google/cloud-trace` が使います)
