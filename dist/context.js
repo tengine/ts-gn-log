@@ -59,6 +59,23 @@ function validateKeys(values) {
             "(trace fields such as logging.googleapis.com/trace are derived automatically from the reserved `trace` key).");
     }
 }
+/**
+ * 動的な値 (利用側の関数の返り値など) を、予約キーを落として ContextFields にする。
+ * オブジェクト以外 (null / 配列 / 文字列) は undefined。投げない — 利用側の関数を境界で
+ * 受ける側 (withRequestTrace など) が使う。runWithContext / setContext の直接呼び出しは
+ * 型で弾き、動的な値は実行時のエラーで知らせる (こちらは投げてよい)。
+ */
+export function normalizeContextFields(value) {
+    if (typeof value !== "object" || value === null || Array.isArray(value))
+        return undefined;
+    const out = {};
+    for (const [key, v] of Object.entries(value)) {
+        if (RESERVED_CONTEXT_KEYS.has(key))
+            continue;
+        out[key] = v;
+    }
+    return out;
+}
 /** 現在の文脈。何も置かれていなければ空 */
 export function getContext() {
     return storage.getStore()?.values ?? EMPTY;

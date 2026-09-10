@@ -13,7 +13,7 @@
  * - https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
  * - https://cloud.google.com/trace/docs/trace-context
  */
-import type { ContextFields } from "../context.js";
+import { type ContextFields } from "../context.js";
 import type { Env } from "../level.js";
 import { currentTrace, type HeadersLike, runWithTrace, setTrace, type TraceContext } from "../trace.js";
 export { currentTrace, runWithTrace, setTrace };
@@ -64,7 +64,7 @@ export interface RequestLike {
     headers: HeadersLike;
 }
 export interface WithRequestTraceOptions<Req> {
-    /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい (投げたら fields 無しで続ける) */
+    /** trace とあわせて文脈に置くフィールド。リクエストから組み立てる関数でもよい (投げたら fields 無し、予約キーは落とす。リクエストは落とさない) */
     fields?: ContextFields | ((request: Req) => ContextFields);
     /** ヘッダに trace が無いときの新規生成。省略時は traceId だけ (spanId / sampled は不明)。不正な値や例外は既定に倒す */
     newTrace?: () => TraceContext;

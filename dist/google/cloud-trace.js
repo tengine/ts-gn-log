@@ -13,6 +13,7 @@
  * - https://cloud.google.com/logging/docs/structured-logging#special-payload-fields
  * - https://cloud.google.com/trace/docs/trace-context
  */
+import { normalizeContextFields } from "../context.js";
 import { currentTrace, headerValue, INVALID_TRACE_ID, newTraceId, normalizeTrace, runWithTrace, setTrace, traceFromHeaders as traceparentFromHeaders, traceHeaders as traceparentHeaders, } from "../trace.js";
 // 共通部の関数をこのモジュールからも使えるようにする (py-gn-log の cloud_trace と同じ並び)
 export { currentTrace, runWithTrace, setTrace };
@@ -138,8 +139,10 @@ function safeGenerate(generate) {
     }
 }
 function safeFields(fields, request) {
+    // newTrace と同じく返り値を正規化する (オブジェクト以外は捨て、予約キーは落とす)。
+    // 例外も既定 (fields 無し) に倒す
     try {
-        return typeof fields === "function" ? fields(request) : fields;
+        return normalizeContextFields(typeof fields === "function" ? fields(request) : fields);
     }
     catch {
         return undefined;

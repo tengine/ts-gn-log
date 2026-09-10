@@ -44,6 +44,13 @@ export type ContextFields = {
 };
 /** 実行時の検査に使う予約キーの集合 (ReservedContextKey と同じ内容) */
 export declare const RESERVED_CONTEXT_KEYS: ReadonlySet<string>;
+/**
+ * 動的な値 (利用側の関数の返り値など) を、予約キーを落として ContextFields にする。
+ * オブジェクト以外 (null / 配列 / 文字列) は undefined。投げない — 利用側の関数を境界で
+ * 受ける側 (withRequestTrace など) が使う。runWithContext / setContext の直接呼び出しは
+ * 型で弾き、動的な値は実行時のエラーで知らせる (こちらは投げてよい)。
+ */
+export declare function normalizeContextFields(value: unknown): ContextFields | undefined;
 /** 現在の文脈。何も置かれていなければ空 */
 export declare function getContext(): Context;
 /**
