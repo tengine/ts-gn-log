@@ -50,7 +50,15 @@ npm install github:tengine/ts-gn-log#v0.1.0
 
 ## Cloud Run での使用
 
-(機能を足す PR で書く)
+Cloud Run (Service / Job / Worker Pool) 上かどうかは、Cloud Run が自動設定する環境変数 `K_SERVICE` / `CLOUD_RUN_JOB` / `CLOUD_RUN_WORKER_POOL` のいずれかが存在するかで判定します (py-gn-log の `is_cloud_run()` と同じ 3 変数、同じ判定)。判定だけを使う場合は `isCloudRun()` を呼びます。
+
+```ts
+import { isCloudRun } from "ts-gn-log/google/cloud-run";
+
+if (isCloudRun()) {
+  // Cloud Run 上
+}
+```
 
 ## 開発者向け
 
