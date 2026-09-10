@@ -156,6 +156,36 @@ describe("setContext / clearContext", () => {
     expect(r.after).toEqual({ a: 1 });
   });
 
+  it("await しない fn の reject は握り潰されず、unhandledRejection として届く", async () => {
+    const caught = new Promise<unknown>((resolve) => {
+      const handler = (reason: unknown) => {
+        process.off("unhandledRejection", handler);
+        resolve(reason);
+      };
+      process.on("unhandledRejection", handler);
+    });
+    runWithContext({}, async () => {
+      throw new Error("uncaught-boom");
+    });
+    const reason = await Promise.race([
+      caught,
+      tick()
+        .then(() => tick())
+        .then(() => "not fired"),
+    ]);
+    expect(String(reason)).toMatch(/uncaught-boom/);
+  });
+
+  it("await した場合は同じ値 / 同じエラーが返り、settle 後に範囲が閉じる", async () => {
+    await expect(runWithContext({}, async () => 42)).resolves.toBe(42);
+    const err = new Error("e");
+    await expect(
+      runWithContext({}, async () => {
+        throw err;
+      }),
+    ).rejects.toBe(err);
+  });
+
   it("同期の fn は戻った時点で範囲が終わり、そこから逃げたマイクロタスクの更新もエラー", async () => {
     const seen = new Promise<unknown>((resolve) => {
       runWithContext({}, () => {

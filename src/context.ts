@@ -95,6 +95,8 @@ export function getContext(): Context {
 /**
  * fn の間だけ文脈に値を足す。fn が返す Promise が終わるまで (await 先も含めて) 有効で、
  * 抜けると元の文脈に戻る。入れ子にでき、内側の値が同じキーを上書きする。
+ * fn が Promise を返すときは、同じ結果 (値 / 例外) を運ぶ派生の Promise を返す —
+ * 呼び出し元が await / catch しなければ、その reject は通常どおり unhandledRejection になる。
  *
  * @throws 予約キー (固定キーと同名) を含むとき
  */
@@ -112,11 +114,22 @@ export function runWithContext<T>(values: Record<string, unknown>, fn: () => T):
     throw e;
   }
   if (isPromiseLike(result)) {
-    // 範囲は fn が返した Promise が settle するまで。settle 後の更新は受け付けない
-    result.then(close, close);
-  } else {
-    close();
+    // 範囲は fn が返した Promise が settle するまで。後付けの then で観測すると、そのハンドラが
+    // 呼び出し元の握らなかった reject を「処理済み」にして unhandledRejection を握り潰すので、
+    // 観測ではなく「閉じてから同じ結果を返す派生の Promise」を返す。呼び出し元が派生を
+    // 握らなければ、派生が unhandledRejection として報告される
+    return Promise.resolve(result).then(
+      (value) => {
+        close();
+        return value;
+      },
+      (error: unknown) => {
+        close();
+        throw error;
+      },
+    ) as unknown as T;
   }
+  close();
   return result;
 }
 
