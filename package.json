@@ -1,6 +1,6 @@
 {
   "name": "ts-gn-log",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cloud Run 上の Node.js サーバから Cloud Logging 向けの構造化ログを出すライブラリ (py-gn-log の TypeScript 版)",
   "private": true,
   "type": "module",
