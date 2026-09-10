@@ -14,7 +14,12 @@
  *   1. UUID (8-4-4-4-12 の 16 進数、大文字小文字を問わない) を `<uuid>` に置き換える
  *   2. 引用文字列 (改行を含まない) を `<str>` に置き換える。二重引用符で囲まれたもの、または
  *      単一引用符で囲まれたもののうち開き引用符の直前が ASCII の英数字・下線でないもの
- *      (can't のようなアポストロフィは引用符とみなさない。閉じ引用符の直後は問わない)
+ *      (can't のようなアポストロフィは引用符とみなさない。閉じ引用符の直後は問わないので
+ *      'bob's のような所有格も引用文字列として扱う)。
+ *      限界: 単一引用符は引用の区切りとアポストロフィを同じ文字で兼ねるため、アポストロフィで
+ *      始まる語 ('cause, '90s) や対になっていない単一引用符があると、そこから次の単一引用符
+ *      までが `<str>` になる (別種のエラーが同じ fingerprint にまとまる)。厳密さが必要な
+ *      メッセージでは二重引用符を使うこと
  *   3. 数値を `<num>` に置き換える。ASCII の数字の並びで、3 桁ごとのカンマ区切り・小数部・
  *      指数部を含めて 1 つの数値とし、前後は ASCII の単語境界で区切る
  *   4. 先頭 300 文字に切り詰める。単位は Unicode のコードポイント (py-gn-log #26 の案 1。
@@ -23,6 +28,12 @@
  *   5. surface / operation / error_type / 正規化したメッセージのそれぞれについて `\` を `\\` に、
  *      `|` を `\|` に escape してから `|` で連結し、UTF-8 の SHA-1 の 16 進表現の先頭 16 文字を
  *      fingerprint とする
+ *
+ * 契約の限界 (孤立サロゲート): JS 側で文字列を UTF-16 単位に切り詰めた結果 (例:
+ * `"boom 😀".slice(0, 6)`) のように、対にならないサロゲートを含むメッセージでは両言語の値が
+ * 揃わない。ts 側は Node の既定に従って U+FFFD に置き換えて値を返す (ログの呼び出しは投げない
+ * 方針に合わせる) が、py 側は UnicodeEncodeError になり、その行に fingerprint が付かない。
+ * どちらに揃えるかは py-gn-log 側で決める (未決)。
  */
 import { createHash } from "node:crypto";
 /** 正規化後のメッセージの最大長 (コードポイント数) */
@@ -57,10 +68,36 @@ export function normalizeMessage(message, maxLength = MAX_MESSAGE_LENGTH) {
         .replace(NUMBER_PATTERN, NUM_PLACEHOLDER);
     return truncateCodePoints(normalized, maxLength);
 }
-/** 先頭 maxLength コードポイントに切り詰める (サロゲートペアを分断しない) */
+/**
+ * 先頭 maxLength コードポイントに切り詰める (サロゲートペアを分断しない)。
+ * 負の maxLength は Python の `s[:negative]` と同じく末尾から削る。
+ *
+ * 入力を配列に展開しない — 数十 MB のメッセージを `Array.from` に通すとヒープを使い切り、
+ * catch できない fatal OOM でプロセスが落ちるため。UTF-16 コード単位の数はコードポイント数
+ * 以上なので、まず `s.length` で切り詰めが要るかを判定し、要るときだけ必要な分を走査する。
+ */
 function truncateCodePoints(s, maxLength) {
-    const chars = Array.from(s);
-    return chars.length <= maxLength ? s : chars.slice(0, maxLength).join("");
+    if (maxLength >= 0 && s.length <= maxLength)
+        return s;
+    let keep = maxLength;
+    if (maxLength < 0) {
+        // 末尾から削るには全体のコードポイント数が要る。数え上げも配列を作らずに行う
+        let total = 0;
+        for (const _ch of s)
+            total += 1;
+        keep = total + maxLength;
+    }
+    if (keep <= 0)
+        return "";
+    let out = "";
+    let count = 0;
+    for (const ch of s) {
+        if (count === keep)
+            break;
+        out += ch;
+        count += 1;
+    }
+    return out;
 }
 /** 連結の区切り文字 `|` が値に含まれていても区切りと区別できるように escape する */
 function escapeComponent(value) {
