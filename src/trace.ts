@@ -141,10 +141,13 @@ const SPAN_ID_PATTERN = /^[0-9a-f]{16}$/;
 export function normalizeTrace(value: unknown): TraceContext | undefined {
   if (!isTraceContext(value)) return undefined;
   const traceId = value.traceId.toLowerCase();
-  if (!TRACE_ID_PATTERN.test(traceId)) return undefined;
+  // 解析側 (parseTraceparent / parseCloudTraceContext) と同じく、W3C が無効とする全 0 も拒む
+  if (!TRACE_ID_PATTERN.test(traceId) || traceId === INVALID_TRACE_ID) return undefined;
   const trace: TraceContext = { traceId };
   const spanId = typeof value.spanId === "string" ? value.spanId.toLowerCase() : undefined;
-  if (spanId !== undefined && SPAN_ID_PATTERN.test(spanId)) trace.spanId = spanId;
+  if (spanId !== undefined && SPAN_ID_PATTERN.test(spanId) && spanId !== INVALID_SPAN_ID) {
+    trace.spanId = spanId;
+  }
   if (typeof value.sampled === "boolean") trace.sampled = value.sampled;
   return trace;
 }

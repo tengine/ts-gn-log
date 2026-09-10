@@ -131,6 +131,17 @@ describe("normalizeTrace (境界の検証)", () => {
     expect(normalizeTrace("x")).toBeUndefined();
   });
 
+  it("全 0 の traceId は trace 無し、全 0 の spanId は落とす (解析側と同じ。W3C の無効値)", async () => {
+    const { normalizeTrace } = await import("../src/trace.js");
+    expect(normalizeTrace({ traceId: "0".repeat(32) })).toBeUndefined();
+    expect(normalizeTrace({ traceId: TID, spanId: "0".repeat(16), sampled: true })).toEqual({
+      traceId: TID,
+      sampled: true,
+    });
+    // 送った traceparent を自分の解析が拒まない
+    expect(traceHeaders({ traceId: TID, spanId: "0".repeat(16), sampled: true })).toEqual({});
+  });
+
   it("不正な spanId / sampled は落とす", async () => {
     const { normalizeTrace } = await import("../src/trace.js");
     expect(normalizeTrace({ traceId: TID, spanId: "", sampled: true })).toEqual({
