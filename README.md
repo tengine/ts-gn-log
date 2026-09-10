@@ -10,8 +10,8 @@ py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS �
 
 | サブパス | 役割 | 状態 |
 |---|---|---|
-| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `level` / `output` を再輸出 |
-| `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 未実装 |
+| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `level` / `output` を再輸出 |
+| `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 実装済み |
 | `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 未実装 |
 | `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 実装済み |
 | `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し、Logger の核 | 実装済み |
@@ -73,6 +73,37 @@ Cloud Run 上の出力 (1 行の JSON):
 - 呼び出し時のフィールドはそのまま JSON のキーになります。キー名は py-gn-log の `extra` と同じく snake_case を推奨します。`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` と同名のフィールドは固定の値が勝ちます
 - `err` だけは特別で、severity が ERROR 以上なら `stack_trace` (Error Reporting が認識するフィールド) に、WARNING 以下なら `error` に、その文字列 (Error なら `stack`) が入ります。`err` は Error でなくても構いません (文字列などはそのまま入り、`message` は変わりません)。`child({ err })` の固定フィールドに渡した `err` も同じ扱いです
 - ローカルの text 形式は `2026-09-09T01:23:45.678Z INFO     bff  task accepted  {"site":"site-a"}` の 1 行で、`err` があれば次の行以降に stack が続きます。書式は固定です
+
+### リクエスト / タスク単位の文脈を全ログ行に付ける
+
+1 つのリクエストや 1 つのタスクの処理中に出るログ行を、あとから 1 つの ID で串刺しにしたい場面のために、`ts-gn-log/context` を用意しています (py-gn-log の `gnlog.context` と対)。`node:async_hooks` の AsyncLocalStorage に置いた値を、ロガーが出力時にフィールドとして混ぜます。Next.js の Route Handler は Node の非同期文脈をそのまま通すので、`await` 先まで届きます。
+
+```ts
+import { runWithContext, setContext, clearContext, getContext } from "ts-gn-log/context";
+
+// fn の間だけ付ける (抜けると元に戻る。入れ子にでき、内側の値が勝つ)
+await runWithContext({ request_id: "4bf92f35", site: "tokyo" }, async () => {
+  log.info("処理開始"); // {"request_id":"4bf92f35","site":"tokyo","message":"処理開始",...}
+  await doWork();      // この中のログにも付く
+});
+
+// いちばん内側の runWithContext の範囲を更新する (その範囲が終わるまで残る)。
+// リクエストの途中で分かった値 (本文から取り出した ID など) を後から足す使い方
+await runWithContext({}, async () => {
+  const body = await req.json();
+  setContext({ request_id: body.id }); // コールバックや await 先で呼んでも、同じ範囲なので残る
+  log.info("...");
+  clearContext();                        // この範囲の文脈を空にする (外側の範囲は消さない)
+});
+```
+
+`setContext` / `clearContext` は `runWithContext` の外では使えません (`Error` になります)。`runWithContext` の中で始めて `await` し忘れた処理から、範囲が終わった後に `setContext` した場合は、エラーにはならず、その書き込みは誰にも読まれません (その処理自身のログには、範囲が生きていた頃の文脈が付きます)。文脈の更新は、その範囲を待っている処理の中で行ってください。`runWithContext` は fn が返した Promise をそのまま返し、観測しません — `await` / `catch` しなかった reject は通常どおり unhandled rejection になります。Node の `AsyncLocalStorage` には Python の `ContextVar` のような「タスクごとに複製される Context」が無く、範囲の外で置いた値はプロセス全体の既定になって別のリクエストに漏れるため、範囲の中でしか更新できないようにしています。Next.js の Route Handler は `withRequestTrace` (Cloud Trace の節) で囲う前提です。
+
+- キー名は自由ですが、`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` / `stack_trace` / `error` / `fields_error` / `format_error` / `err` は出力の固定キーと同名なので置けません (`Error` になります)。py-gn-log の `extra` と同じく snake_case を推奨します
+- `trace` は予約キーで、出力には混ぜません (`ts-gn-log/trace` と `ts-gn-log/google/cloud-trace` が使います)
+- 値が `null` / `undefined` のキーは出力されません (入れ子で外側の値を一時的に外すのに使えます)
+- 優先順位は 呼び出し時のフィールド > `child()` の固定フィールド > 文脈 です
+- text 形式でも同じくフィールドとして末尾の JSON に出ます
 
 ## 環境変数
 

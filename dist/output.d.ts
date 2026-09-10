@@ -27,7 +27,7 @@ export interface LogRecord {
     level: Level;
     message: string;
     timestamp: Date;
-    /** 子ロガーの固定フィールドと呼び出し時のフィールドを合わせたもの (`err` は含まない) */
+    /** 文脈 (ts-gn-log/context)、子ロガーの固定フィールド、呼び出し時のフィールドを合わせたもの (`err` は含まない) */
     fields: Record<string, unknown>;
     /** 呼び出し時に `err` として渡されたもの。Error でなくてもよい */
     err?: unknown;
