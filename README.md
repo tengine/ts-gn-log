@@ -10,9 +10,9 @@ py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS �
 
 | サブパス | 役割 | 状態 |
 |---|---|---|
-| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `level` / `output` / `trace` を再輸出 |
+| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `fingerprint` / `level` / `output` / `trace` を再輸出 |
 | `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 実装済み |
-| `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 未実装 |
+| `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 実装済み |
 | `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 実装済み |
 | `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し、Logger の核 | 実装済み |
 | `ts-gn-log/trace` | W3C Trace Context (`traceparent`) の解釈・組み立てと、現在の trace の保持 | 実装済み |
@@ -128,6 +128,27 @@ export const POST = withRequestTrace(async (req: Request) => {
 - `logging.googleapis.com/trace` の組み立てにはプロジェクト ID が要ります。`createLogger({ projectId })` か環境変数 `GOOGLE_CLOUD_PROJECT` で指定し、どちらも無ければ trace のフィールドは付きません (既定値を持たない)。その場合でも `currentTrace()` と `traceHeaders()` は動くので、下流への引き継ぎはできます
 - `withRequestTrace` は `runWithContext` で囲むので、その中で `setContext` が使えます。`fields` オプションで、trace とあわせて置くフィールド (リクエストから組み立てる関数でもよい) を渡せます。py-gn-log の `cloud_trace.bind(trace, log_fields(...))` と違い、`logging.googleapis.com/trace` などの trace のフィールドは `fields` に渡しません (予約キー `trace` から `jsonFormat` が自動で組みます。渡すと型エラーになります)。`newTrace` / `fields` の関数が投げてもリクエストは落とさず、既定 (生成し直す / fields 無し) に倒します
 - HTTP 以外の経路 (Pub/Sub の属性、タスクのペイロード) では、発行側で `traceHeaders()` の値を属性に載せ、受信側で `traceFromHeaders(attributes)` (名前と値の Record を受けます) で取り出して `runWithTrace(trace, undefined, fn)` で囲みます
+
+### ERROR のログを同種ごとにまとめる fingerprint
+
+`ts-gn-log/fingerprint` は、メッセージの可変部 (ID、件数、引用文字列) を置き換えて正規化し、分類と組み合わせた短いハッシュを作ります (py-gn-log の `gnlog.fingerprint` と対)。Error Reporting が自動でグループ化できないエラー (例外を伴わない ERROR など) の dedup に使います。`createLogger` の `errorEvent` オプション (PR 7 で実装) が ERROR 以上のログに自動で付けます。
+
+```ts
+import { normalizeMessage, buildFingerprint } from "ts-gn-log/fingerprint";
+
+normalizeMessage('order 123 for "alice" not found');
+// => 'order <num> for <str> not found'
+buildFingerprint("worker", "orders.create", "validation", "order 123 missing");
+// => sha1("worker|orders.create|validation|order <num> missing") の先頭 16 文字
+```
+
+規則は py-gn-log との契約 (設計案 §2 の 3 番目) で、正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」です。要点: UUID → `<uuid>`、引用文字列 → `<str>`、数値 → `<num>` の順に置き換え、先頭 300 文字に切り詰め、`surface` / `operation` / `error_type` / 正規化したメッセージを `\` と `|` を escape して `|` で連結し、UTF-8 の SHA-1 の先頭 16 文字。**切り詰めの単位は Unicode のコードポイント** (Python の `len()` と同じ。JavaScript の `.length` は UTF-16 コード単位なので使いません。py-gn-log #26)。
+
+両言語で同じ値になることは、py-gn-log の Python 実装から生成したゴールデンベクタ (`test/fixtures/fingerprint-golden.json`) で検証しています。規則を変えたときは py-gn-log の環境で再生成します:
+
+```
+cd ../py-gn-log && uv run python ../ts-gn-log/test/fixtures/generate-fingerprint-golden.py "$(git rev-parse --short HEAD)" > ../ts-gn-log/test/fixtures/fingerprint-golden.json
+```
 
 ## 環境変数
 

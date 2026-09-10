@@ -19,6 +19,10 @@
       "types": "./dist/context.d.ts",
       "default": "./dist/context.js"
     },
+    "./fingerprint": {
+      "types": "./dist/fingerprint.d.ts",
+      "default": "./dist/fingerprint.js"
+    },
     "./level": {
       "types": "./dist/level.d.ts",
       "default": "./dist/level.js"
