@@ -46,7 +46,17 @@ npm install github:tengine/ts-gn-log#v0.1.0
 
 ## 環境変数
 
-(機能を足す PR で書く)
+py-gn-log と同じ名前と意味です。
+
+| 環境変数 | 意味 | 未設定のとき |
+|---|---|---|
+| `LOG_LEVEL` | 出力するレベルの下限。`DEBUG` / `INFO` / `WARN` / `WARNING` / `ERROR` / `CRITICAL` (大文字小文字を問わない) | `INFO`。未知の値も `INFO` に倒す (エラーにしない) |
+| `GNLOG_FORMAT` | 出力形式を明示的に指定する。`json` (Cloud Logging 向けの JSON 行) か `text` (人が読む形式)。それ以外の値は `createLogger()` がエラーを投げる | Cloud Run 上 (`K_SERVICE` などがある) なら `json`、それ以外なら `text` |
+| `K_SERVICE` / `CLOUD_RUN_JOB` / `CLOUD_RUN_WORKER_POOL` | Cloud Run が自動設定する。存在すれば Cloud Run 上と判定する | — |
+
+`createLogger({ level, json })` の引数は環境変数より優先します。`json` を引数で指定した場合は `GNLOG_FORMAT` を読まないので、不正な値があってもエラーになりません。
+
+py-gn-log にある `LOG_FILE_PATH` (テキスト形式のファイル出力) と `LOG_FORMAT` (テキスト形式の書式文字列) は、ts-gn-log にはありません。Cloud Run では stdout / stderr が標準の経路で、ローカルの text 形式は固定です。
 
 ## Cloud Run での使用
 
