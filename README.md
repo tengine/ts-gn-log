@@ -54,6 +54,8 @@ const log = createLogger({
   labels: { service: "frontend" },    // logging.googleapis.com/labels (JSON 形式のみ)
   // level: "INFO",                   // 省略時は LOG_LEVEL、無ければ INFO
   // json: true,                      // 省略時は GNLOG_FORMAT、無ければ Cloud Run 上なら JSON
+  // projectId: "my-project",         // logging.googleapis.com/trace の組み立てに使う。省略時は GOOGLE_CLOUD_PROJECT
+  // fields: { app: "bff" },          // 全行に付く固定フィールド (child() の固定フィールドと同じ扱い)
 });
 
 log.info("task accepted", { site: "site-a", operation: "POST /api/v1/things" });
