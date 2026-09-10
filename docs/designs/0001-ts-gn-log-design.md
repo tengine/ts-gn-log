@@ -19,6 +19,13 @@ py-gn-log の TypeScript 版。Cloud Run 上の Node.js サーバ (当面は Nex
 
 py-gn-log (`e7119631`) の実出力と、利用プロジェクト A の自前実装の出力を突き合わせて決めた。
 
+**契約として揃えるのは、運用する人が言語を意識せずに 1 つのクエリ・1 つの集計でログを扱うために要る次の 4 種類** (2026-09-10 に整理)。それ以外のキーは各言語が自分の都合で出してよく、出力キーの集合を一致させることは目的ではない。
+
+1. Cloud Logging / Error Reporting が読む特殊フィールド (`severity` / `message` / `timestamp` / `logging.googleapis.com/*` / `stack_trace`)。名前は Google が決めている
+2. trace の運び方 — `logging.googleapis.com/trace` の値の形と、HTTP / HTTP 以外の経路で trace を渡すヘッダ・キー。揃わないと言語の境界で 1 つのリクエストのログが途切れる
+3. `fingerprint` の計算規則。同じエラーに両言語で同じ値を付け、dedup と集計を言語をまたいで行う
+4. 共通のクエリ・Log-based metrics に使うキー名 (`name` / `event` / `error_type` / `operation`) と、その snake_case の流儀
+
 ### 2.1 すべての行に付くもの
 
 | キー | 値 | 備考 |
@@ -51,7 +58,7 @@ py-gn-log (`e7119631`) の実出力と、利用プロジェクト A の自前実
 
 ### 2.4 py-gn-log 側に変更を求めるもの
 
-- `stack_info: null` が常に付く (`gnlog.google.cloud_logging.JsonFormatter.parse()` に `stack_info` を含めているため。2026-09-10 の main でも同じ)。ts 側では出さないので、py 側で外すか、両方で出すかを決める必要がある → py-gn-log に小さな Issue を足す (未起票)
+- ~~`stack_info: null` が常に付く (`gnlog.google.cloud_logging.JsonFormatter.parse()` に `stack_info` を含めているため)。ts 側では出さないので、py 側で外すか、両方で出すかを決める必要がある~~ → 決着 (2026-09-10): `stack_info` は §2 冒頭の 4 種類のどれにも当たらない (Google が読まず、値は常に `null` で、クエリにも集計にも使わない) ので、揃える対象ではない。py-gn-log には変更を求めず、ts 側は出さない
 - キー名の snake_case (`error_type` / `trace_id`) は py-gn-log の `extra` の流儀に従う。利用プロジェクト A の現行 camelCase (`traceId` / `errorType`) は ts-gn-log では採らない
 
 ## 3. API 案
@@ -92,7 +99,7 @@ export const POST = withRequestTrace(async (req) => { ... }) // Next.js Route Ha
 - **ロガーは `console` を経由せず `process.stdout` / `process.stderr` に 1 行書く** (Next.js の `console` パッチや色付けの影響を受けないため)。severity が ERROR 以上なら stderr、それ以外は stdout (Cloud Run は両方を取り込む)
 - **ローカル (Cloud Run 外) は人が読める text 形式** (`2026-09-09T01:23:45.678Z INFO  bff  message  {fields}`)。`json: true` で JSON を強制できる
 - **Cloud Run 判定は `K_SERVICE` / `CLOUD_RUN_JOB` / `CLOUD_RUN_WORKER_POOL` の存在** (py-gn-log と同じ 3 変数、同じ `!= undefined` 判定)
-- **`err` は `Error` でなくてもよい** (文字列 / unknown を `message` に落とす)
+- **`err` は `Error` でなくてもよい** (Error なら `stack`、文字列 / unknown はその文字列を `stack_trace` に入れる。`message` は変えない。WARNING 以下では `stack_trace` ではなく `error` に入れ、Error Reporting に集計させない)
 - **文脈は AsyncLocalStorage** (`node:async_hooks`)。Next.js の Route Handler は Node の非同期文脈をそのまま通すので、リクエストごとの文脈を全 await 先まで運べる。Python の ContextVar と同じ位置づけ
 - **trace が無いリクエストでは新規に trace id を生成する** (32 hex)。Cloud Run が付ける `X-Cloud-Trace-Context` があればそれを優先。W3C `traceparent` も読む (OpenTelemetry と互換にしておくため。`@opentelemetry/api` 自体には依存しない)
 - **応答 body に載せる trace id は Cloud Trace の trace id にする** (利用側が応答 body に持つキー名はそのまま、値だけが独自形式から Cloud Trace の id に変わる)。利用者報告の値からログを引く運用は維持できる
@@ -188,7 +195,7 @@ ts-gn-log/
 ## 7. 残る確認
 
 - ~~ライセンス表記 (public にするので `LICENSE` ファイルを置くかどうか。py-gn-log に合わせる)~~ → py-gn-log に `LICENSE` が無いので置かない (2026-09-10)
-- py-gn-log 側の `stack_info: null` (§2.4) を外すかどうか
+- ~~py-gn-log 側の `stack_info: null` (§2.4) を外すかどうか~~ → 揃える対象ではないと整理し、変更を求めない (2026-09-10。§2 冒頭と §2.4)
 - fingerprint の「300 文字」の単位 (py-gn-log #26)
 
 ## 8. py-gn-log 側の状況 (2026-09-10 追記)
