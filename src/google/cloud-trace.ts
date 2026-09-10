@@ -79,3 +79,20 @@ export function projectIdFromEnv(env: Env = process.env): string | undefined {
   const value = env[PROJECT_ID_ENV_VAR];
   return value === undefined || value === "" ? undefined : value;
 }
+
+/**
+ * trace から Cloud Logging の特殊フィールドを組み立てる。projectId が無ければ空
+ * (trace のフィールドは付けない — 既定値で本番のプロジェクト ID を持たないため)。
+ */
+export function logFields(
+  trace: TraceContext,
+  projectId: string | undefined,
+): Record<string, unknown> {
+  if (projectId === undefined || projectId === "") return {};
+  const fields: Record<string, unknown> = {
+    [TRACE_KEY]: `projects/${projectId}/traces/${trace.traceId}`,
+  };
+  if (trace.spanId !== undefined) fields[SPAN_ID_KEY] = trace.spanId;
+  if (trace.sampled !== undefined) fields[TRACE_SAMPLED_KEY] = trace.sampled;
+  return fields;
+}

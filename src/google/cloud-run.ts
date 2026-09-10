@@ -15,6 +15,7 @@ import {
   type Writer,
 } from "../output.js";
 import { jsonFormat } from "./cloud-logging.js";
+import { projectIdFromEnv } from "./cloud-trace.js";
 
 // Cloud Run 上で自動設定される環境変数。いずれかが存在すれば Cloud Run 環境と判定する。
 // - K_SERVICE: Cloud Run Service でのみ自動設定される
@@ -54,6 +55,11 @@ export interface CreateLoggerOptions {
   json?: boolean;
   /** 全行に付く固定フィールド */
   fields?: Record<string, unknown>;
+  /**
+   * logging.googleapis.com/trace の組み立てに使うプロジェクト ID。省略時は環境変数
+   * GOOGLE_CLOUD_PROJECT、それも無ければ trace のフィールドを付けない (既定値を持たない)
+   */
+  projectId?: string;
   /** 書き出し先の差し替え (テスト用)。省略時は stdout / stderr */
   write?: Writer;
   /** 環境変数の差し替え (テスト用)。省略時は process.env */
@@ -78,7 +84,14 @@ export function createLogger(options: CreateLoggerOptions): Logger {
   const fields = isPlainObject(options.fields) ? options.fields : undefined;
   // labels: オブジェクト以外は無視し、値は文字列にする (Cloud Logging の labels は文字列の map)
   const labels = isPlainObject(options.labels) ? stringValues(options.labels) : undefined;
-  const format = json ? jsonFormat(labels === undefined ? {} : { labels }) : textFormat;
+  const projectId =
+    typeof options.projectId === "string" && options.projectId !== ""
+      ? options.projectId
+      : projectIdFromEnv(env);
+  const jsonOptions: Parameters<typeof jsonFormat>[0] = {};
+  if (labels !== undefined) jsonOptions.labels = labels;
+  if (projectId !== undefined) jsonOptions.projectId = projectId;
+  const format = json ? jsonFormat(jsonOptions) : textFormat;
   const core: Parameters<typeof createCoreLogger>[0] = {
     name: options.name,
     level,
