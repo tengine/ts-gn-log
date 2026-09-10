@@ -32,8 +32,18 @@
  * 契約の限界 (孤立サロゲート): JS 側で文字列を UTF-16 単位に切り詰めた結果 (例:
  * `"boom 😀".slice(0, 6)`) のように、対にならないサロゲートを含むメッセージでは両言語の値が
  * 揃わない。ts 側は Node の既定に従って U+FFFD に置き換えて値を返す (ログの呼び出しは投げない
- * 方針に合わせる) が、py 側は UnicodeEncodeError になり、その行に fingerprint が付かない。
- * どちらに揃えるかは py-gn-log 側で決める (未決)。
+ * 方針に合わせる) が、py 側は build_fingerprint が UnicodeEncodeError を投げる。それが
+ * Formatter の中で起きるため、error_event を有効にしていると **その ERROR のログ行そのものが
+ * 失われる** (error_event 無しなら同じメッセージが出力されるので、fingerprint の機能が行を
+ * 落としている)。どちらに揃えるかは py-gn-log 側で決める (未決。py 側の行の欠落は
+ * py-gn-log に報告する)。
+ *
+ * 入力の大きさ: 置換は入力の全体に走るので、この関数群は入力の大きさに比例したメモリを使う。
+ * 数十 MB のメッセージでは Node のヒープを使い切り、catch できない fatal OOM でプロセスが
+ * 落ちる (py-gn-log も同じ性質で、Python では MemoryError になる)。**入力の大きさの上限は
+ * 呼び出し側の責務**とする — ログの経路では createLogger の errorEvent が上限を超えた
+ * メッセージに fingerprint を付けない。直接呼ぶ場合は、呼び出し側でメッセージの長さを
+ * 制限すること。
  */
 import { createHash } from "node:crypto";
 /** 正規化後のメッセージの最大長 (コードポイント数) */
@@ -60,6 +70,11 @@ const NUMBER_PATTERN = /\b\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g;
  *
  * @example
  * normalizeMessage('order 123 for "alice" not found') // => 'order <num> for <str> not found'
+ *
+ * @param message 正規化するメッセージ。**大きさの上限は呼び出し側の責務** (置換が全体に走るので、
+ *   数十 MB では fatal OOM でプロセスが落ちる)
+ * @param maxLength 切り詰めるコードポイント数。非整数は `Array.prototype.slice` と同じく
+ *   整数に丸める (NaN は 0)
  */
 export function normalizeMessage(message, maxLength = MAX_MESSAGE_LENGTH) {
     const normalized = message
@@ -77,22 +92,26 @@ export function normalizeMessage(message, maxLength = MAX_MESSAGE_LENGTH) {
  * 以上なので、まず `s.length` で切り詰めが要るかを判定し、要るときだけ必要な分を走査する。
  */
 function truncateCodePoints(s, maxLength) {
-    if (maxLength >= 0 && s.length <= maxLength)
+    // 非整数は `Array.prototype.slice` と同じ意味論で整数に丸める (NaN は 0)。Python の s[:n] は
+    // 非整数で TypeError になるので誤用の範囲だが、丸めずに走査の終了判定に使うと切り詰めが
+    // 効かなくなる (入力全体が返る) ため、ここで正規化する
+    const limit = Number.isNaN(maxLength) ? 0 : Math.trunc(maxLength);
+    if (limit >= 0 && s.length <= limit)
         return s;
-    let keep = maxLength;
-    if (maxLength < 0) {
+    let keep = limit;
+    if (limit < 0) {
         // 末尾から削るには全体のコードポイント数が要る。数え上げも配列を作らずに行う
         let total = 0;
         for (const _ch of s)
             total += 1;
-        keep = total + maxLength;
+        keep = total + limit;
     }
     if (keep <= 0)
         return "";
     let out = "";
     let count = 0;
     for (const ch of s) {
-        if (count === keep)
+        if (count >= keep)
             break;
         out += ch;
         count += 1;
@@ -109,7 +128,8 @@ function escapeComponent(value) {
  * @param surface サービスやコンポーネントの名前 (例: "worker")。無ければ空文字
  * @param operation 操作名 (例: "orders.create")
  * @param errorType エラーの分類 (例: "validation", "infra")
- * @param message ログメッセージ。normalizeMessage で正規化してから使う
+ * @param message ログメッセージ。normalizeMessage で正規化してから使う。**大きさの上限は
+ *   呼び出し側の責務** (上の「入力の大きさ」を参照)
  * @returns `surface|operation|error_type|正規化したメッセージ` (各要素は `\` と `|` を escape 済み)
  *   の UTF-8 SHA-1 の 16 進表現の先頭 16 文字
  */
