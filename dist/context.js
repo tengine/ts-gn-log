@@ -68,11 +68,24 @@ function validateKeys(values) {
 export function normalizeContextFields(value) {
     if (typeof value !== "object" || value === null || Array.isArray(value))
         return undefined;
+    let keys;
+    try {
+        keys = Object.keys(value);
+    }
+    catch {
+        return undefined; // ownKeys が投げる Proxy など
+    }
     const out = {};
-    for (const [key, v] of Object.entries(value)) {
+    for (const key of keys) {
         if (RESERVED_CONTEXT_KEYS.has(key))
             continue;
-        out[key] = v;
+        // getter はキーごとに読む。投げる getter はそのキーだけ落とす (Object.entries だと全部を一度に評価する)
+        try {
+            out[key] = value[key];
+        }
+        catch {
+            // このキーだけ落とす
+        }
     }
     return out;
 }
