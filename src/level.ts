@@ -12,6 +12,13 @@ export type Level = (typeof LEVELS)[number];
 
 export const DEFAULT_LEVEL: Level = "INFO";
 
+/**
+ * 環境変数の入れ物。`process.env` をそのまま渡せる。
+ * `NodeJS.ProcessEnv` を使わないのは、利用側が `@types/node` を型に含めていなくても
+ * この .d.ts が解決できるようにするため。
+ */
+export type Env = Readonly<Record<string, string | undefined>>;
+
 /** 環境変数の名前 */
 export const LOG_LEVEL_ENV_VAR = "LOG_LEVEL";
 
@@ -44,7 +51,7 @@ export function parseLevel(s: string, defaultLevel: Level = DEFAULT_LEVEL): Leve
 /**
  * 環境変数 LOG_LEVEL からレベルを読む。未設定か空なら INFO、未知の値も INFO。
  */
-export function levelFromEnv(env: NodeJS.ProcessEnv = process.env): Level {
+export function levelFromEnv(env: Env = process.env): Level {
   const value = env[LOG_LEVEL_ENV_VAR];
   if (value === undefined || value === "") return DEFAULT_LEVEL;
   return parseLevel(value, DEFAULT_LEVEL);

@@ -6,6 +6,8 @@
  * 関数を組み合わせて入口 (`createLogger()`) を作る。
  */
 
+import { type Env, isEnabled, type Level } from "./level.js";
+
 /** 出力形式を明示的に指定する環境変数とその値。未設定なら provider の入口が渡す既定に従う */
 export const GNLOG_FORMAT_ENV_VAR = "GNLOG_FORMAT";
 export const GNLOG_FORMAT_JSON = "json";
@@ -23,7 +25,7 @@ export const GNLOG_FORMAT_TEXT = "text";
 export function useJsonOutput(
   json: boolean | undefined,
   defaultValue: boolean | (() => boolean) = false,
-  env: NodeJS.ProcessEnv = process.env,
+  env: Env = process.env,
 ): boolean {
   if (json !== undefined) return json;
   const value = env[GNLOG_FORMAT_ENV_VAR];
@@ -38,8 +40,6 @@ export function useJsonOutput(
       `expected ${JSON.stringify(GNLOG_FORMAT_JSON)} or ${JSON.stringify(GNLOG_FORMAT_TEXT)}`,
   );
 }
-
-import { isEnabled, type Level } from "./level.js";
 
 /** 1 行のログの材料。Formatter が文字列にする */
 export interface LogRecord {
