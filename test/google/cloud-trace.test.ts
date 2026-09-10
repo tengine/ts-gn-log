@@ -4,7 +4,9 @@ import {
   parseCloudTraceContext,
   projectIdFromEnv,
   traceFromHeaders,
+  traceHeaders,
 } from "../../src/google/cloud-trace.js";
+import { runWithTrace } from "../../src/trace.js";
 
 const TID = "4bf92f3577b34da6a3ce929d0e0e4736";
 const SID = "00f067aa0ba902b7";
@@ -76,5 +78,33 @@ describe("projectIdFromEnv", () => {
     expect(projectIdFromEnv({ GOOGLE_CLOUD_PROJECT: "my-project" })).toBe("my-project");
     expect(projectIdFromEnv({})).toBeUndefined();
     expect(projectIdFromEnv({ GOOGLE_CLOUD_PROJECT: "" })).toBeUndefined();
+  });
+});
+
+describe("traceHeaders (送信用)", () => {
+  it("traceparent は分かっているときだけ、X-Cloud-Trace-Context は常に (SPAN_ID は 10 進)", () => {
+    expect(traceHeaders({ traceId: TID, spanId: SID, sampled: true })).toEqual({
+      traceparent: `00-${TID}-${SID}-01`,
+      "X-Cloud-Trace-Context": `${TID}/${BigInt(`0x${SID}`)};o=1`,
+    });
+    expect(traceHeaders({ traceId: TID })).toEqual({ "X-Cloud-Trace-Context": TID });
+    expect(traceHeaders({ traceId: TID, sampled: false })).toEqual({
+      "X-Cloud-Trace-Context": `${TID};o=0`,
+    });
+  });
+
+  it("省略すると現在の文脈の trace。無ければ空", () => {
+    expect(traceHeaders()).toEqual({});
+    runWithTrace({ traceId: TID, spanId: SID, sampled: true }, undefined, () => {
+      expect(traceHeaders()).toEqual({
+        traceparent: `00-${TID}-${SID}-01`,
+        "X-Cloud-Trace-Context": `${TID}/${BigInt(`0x${SID}`)};o=1`,
+      });
+    });
+  });
+
+  it("受信 → 送信で往復しても同じ trace になる", () => {
+    const received = traceFromHeaders(new Headers({ "X-Cloud-Trace-Context": `${TID}/123;o=1` }));
+    expect(traceFromHeaders(traceHeaders(received))).toEqual(received);
   });
 });

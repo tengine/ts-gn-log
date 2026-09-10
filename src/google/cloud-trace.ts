@@ -16,11 +16,13 @@
 
 import type { Env } from "../level.js";
 import {
+  currentTrace,
   type HeadersLike,
   headerValue,
   INVALID_TRACE_ID,
   type TraceContext,
   traceFromHeaders as traceparentFromHeaders,
+  traceHeaders as traceparentHeaders,
 } from "../trace.js";
 
 /** Cloud Logging の特殊フィールド名 */
@@ -95,4 +97,21 @@ export function logFields(
   if (trace.spanId !== undefined) fields[SPAN_ID_KEY] = trace.spanId;
   if (trace.sampled !== undefined) fields[TRACE_SAMPLED_KEY] = trace.sampled;
   return fields;
+}
+
+/**
+ * 他サービスを呼び出すときに付ける trace のヘッダを組み立てる。trace を省略すると現在の
+ * 文脈の trace を使う。traceparent は spanId と sampled の両方が分かっているときだけ、
+ * X-Cloud-Trace-Context は省略で不明を表せるので常に付ける。trace が無ければ空。
+ */
+export function traceHeaders(
+  trace: TraceContext | undefined = currentTrace(),
+): Record<string, string> {
+  if (trace === undefined) return {};
+  const headers = traceparentHeaders(trace);
+  let cloud = trace.traceId;
+  if (trace.spanId !== undefined) cloud += `/${BigInt(`0x${trace.spanId}`).toString(10)}`;
+  if (trace.sampled !== undefined) cloud += `;o=${trace.sampled ? 1 : 0}`;
+  headers[CLOUD_TRACE_CONTEXT_HEADER] = cloud;
+  return headers;
 }
