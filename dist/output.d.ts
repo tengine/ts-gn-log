@@ -49,7 +49,7 @@ export interface Logger {
     warn(message: string, fields?: LogFields): void;
     error(message: string, fields?: LogFields): void;
     critical(message: string, fields?: LogFields): void;
-    /** 固定フィールドを持つ子ロガー。名前・レベル・出力先は親と同じ */
+    /** 固定フィールドを持つ子ロガー。名前・レベル・出力先は親と同じ。`err` を渡せば呼び出し時と同じく特別に扱う */
     child(fields: Record<string, unknown>): Logger;
 }
 export interface CoreLoggerOptions {
@@ -75,6 +75,22 @@ export declare const writeToStdio: Writer;
  * provider ごとの入口 (`ts-gn-log/google/cloud-run` の `createLogger`) がこれを組み合わせる。
  */
 export declare function createCoreLogger(options: CoreLoggerOptions): Logger;
+/**
+ * フィールドを JSON にする。ログの呼び出しは例外を投げない (Python の logging と同じ) ので、
+ * 直列化できない値があっても必ず文字列を返す。
+ *
+ * - BigInt は 10 進の文字列にする
+ * - 循環参照は "[Circular]" に置き換える (祖先に同じオブジェクトがあるときだけ。兄弟で同じ
+ *   オブジェクトを参照しているのは循環ではないのでそのまま出す)
+ * - それでも失敗するとき (toJSON や getter が投げる等) は `ok: false` で理由を返す
+ */
+export declare function tryStringify(value: unknown): {
+    ok: true;
+    json: string;
+} | {
+    ok: false;
+    error: string;
+};
 /**
  * `err` をログに載せる文字列にする。Error なら stack (無ければ `name: message`)、
  * それ以外 (文字列 / unknown) は文字列にする。`message` は変えない。

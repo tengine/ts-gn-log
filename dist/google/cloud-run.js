@@ -3,7 +3,7 @@
  *
  * `isCloudRun()` は Cloud Run (Service / Job / Worker Pool) 上で動いているかを判定する。
  */
-import { levelFromEnv } from "../level.js";
+import { levelFromEnv, parseLevel } from "../level.js";
 import { createCoreLogger, textFormat, useJsonOutput as useJsonOutputCommon, } from "../output.js";
 import { jsonFormat } from "./cloud-logging.js";
 // Cloud Run 上で自動設定される環境変数。いずれかが存在すれば Cloud Run 環境と判定する。
@@ -41,7 +41,8 @@ export function useJsonOutput(json, env = process.env) {
 export function createLogger(options) {
     const env = options.env ?? process.env;
     const json = useJsonOutput(options.json, env);
-    const level = options.level ?? levelFromEnv(env);
+    // 引数も環境変数と同じ検証を通す。TypeScript の型は JS からの利用や JSON.parse した設定値を守らない
+    const level = options.level === undefined ? levelFromEnv(env) : parseLevel(options.level);
     const format = json
         ? jsonFormat(options.labels === undefined ? {} : { labels: options.labels })
         : textFormat;
