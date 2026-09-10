@@ -34,6 +34,13 @@
  * 揃わない。ts 側は Node の既定に従って U+FFFD に置き換えて値を返す (ログの呼び出しは投げない
  * 方針に合わせる) が、py 側は UnicodeEncodeError になり、その行に fingerprint が付かない。
  * どちらに揃えるかは py-gn-log 側で決める (未決)。
+ *
+ * 入力の大きさ: 置換は入力の全体に走るので、この関数群は入力の大きさに比例したメモリを使う。
+ * 数十 MB のメッセージでは Node のヒープを使い切り、catch できない fatal OOM でプロセスが
+ * 落ちる (py-gn-log も同じ性質で、Python では MemoryError になる)。**入力の大きさの上限は
+ * 呼び出し側の責務**とする — ログの経路では createLogger の errorEvent が上限を超えた
+ * メッセージに fingerprint を付けない。直接呼ぶ場合は、呼び出し側でメッセージの長さを
+ * 制限すること。
  */
 
 import { createHash } from "node:crypto";
@@ -66,6 +73,11 @@ const NUMBER_PATTERN = /\b\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g;
  *
  * @example
  * normalizeMessage('order 123 for "alice" not found') // => 'order <num> for <str> not found'
+ *
+ * @param message 正規化するメッセージ。**大きさの上限は呼び出し側の責務** (置換が全体に走るので、
+ *   数十 MB では fatal OOM でプロセスが落ちる)
+ * @param maxLength 切り詰めるコードポイント数。非整数は `Array.prototype.slice` と同じく
+ *   整数に丸める (NaN は 0)
  */
 export function normalizeMessage(message: string, maxLength: number = MAX_MESSAGE_LENGTH): string {
   const normalized = message
@@ -114,7 +126,8 @@ function escapeComponent(value: string): string {
  * @param surface サービスやコンポーネントの名前 (例: "worker")。無ければ空文字
  * @param operation 操作名 (例: "orders.create")
  * @param errorType エラーの分類 (例: "validation", "infra")
- * @param message ログメッセージ。normalizeMessage で正規化してから使う
+ * @param message ログメッセージ。normalizeMessage で正規化してから使う。**大きさの上限は
+ *   呼び出し側の責務** (上の「入力の大きさ」を参照)
  * @returns `surface|operation|error_type|正規化したメッセージ` (各要素は `\` と `|` を escape 済み)
  *   の UTF-8 SHA-1 の 16 進表現の先頭 16 文字
  */

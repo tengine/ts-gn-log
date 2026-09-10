@@ -148,6 +148,8 @@ buildFingerprint("worker", "orders.create", "validation", "order 123 missing");
 
 もう 1 つの限界は孤立サロゲートです。JS 側で文字列を UTF-16 単位に切り詰めた結果 (`"boom 😀".slice(0, 6)` など) のように対にならないサロゲートを含むメッセージでは、ts 側は U+FFFD に置き換えて値を返しますが (ログの呼び出しは投げない方針に合わせています)、py 側は `UnicodeEncodeError` になり fingerprint が付きません。両言語の値が揃わないので、切り詰めるならコードポイント単位で行ってください。契約としてどちらに揃えるかは py-gn-log 側で決めます (未決)。
 
+**入力の大きさの上限は呼び出し側の責務です。** 置換は入力の全体に走るので、`normalizeMessage` / `buildFingerprint` は入力の大きさに比例したメモリを使います。数十 MB のメッセージでは Node のヒープを使い切り、`try`/`catch` で受けられない fatal OOM でプロセスが落ちます (py-gn-log も同じ性質で、Python では `MemoryError`)。ログの経路では `createLogger` の `errorEvent` が上限を超えたメッセージに fingerprint を付けないので、利用側で気にする必要はありません。これらの関数を直接呼ぶ場合は、呼び出し側でメッセージの長さを制限してください。
+
 両言語で同じ値になることは、py-gn-log の Python 実装から生成したゴールデンベクタ (`test/fixtures/fingerprint-golden.json`) で検証しています。規則を変えたときは py-gn-log の環境で再生成します:
 
 ```
