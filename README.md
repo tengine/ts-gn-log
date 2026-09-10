@@ -144,6 +144,8 @@ buildFingerprint("worker", "orders.create", "validation", "order 123 missing");
 
 規則は py-gn-log との契約 (設計案 §2 の 3 番目) で、正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」です。要点: UUID → `<uuid>`、引用文字列 → `<str>`、数値 → `<num>` の順に置き換え、先頭 300 文字に切り詰め、`surface` / `operation` / `error_type` / 正規化したメッセージを `\` と `|` を escape して `|` で連結し、UTF-8 の SHA-1 の先頭 16 文字。**切り詰めの単位は Unicode のコードポイント** (Python の `len()` と同じ。JavaScript の `.length` は UTF-16 コード単位なので使いません。py-gn-log #26)。
 
+単一引用符には限界があります。引用の区切りとアポストロフィを同じ文字で兼ねるため、アポストロフィで始まる語 (`'cause`、`'90s`) や対になっていない単一引用符があると、そこから次の単一引用符までが `<str>` にまとまり、別種のエラーが同じ fingerprint になります。厳密さが必要なメッセージでは二重引用符を使ってください (py-gn-log の README と同じ限界です)。
+
 両言語で同じ値になることは、py-gn-log の Python 実装から生成したゴールデンベクタ (`test/fixtures/fingerprint-golden.json`) で検証しています。規則を変えたときは py-gn-log の環境で再生成します:
 
 ```
