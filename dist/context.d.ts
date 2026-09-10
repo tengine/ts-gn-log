@@ -41,8 +41,10 @@ export declare function runWithContext<T>(values: Record<string, unknown>, fn: (
 /**
  * いちばん内側の runWithContext の範囲に値を足す。その範囲が終わるまで (await 先、
  * コールバックの中も含めて) 残り、範囲を抜けると消える。runWithContext の外では使えない。
+ * 範囲が終わった後 (fn が返した Promise の settle 後) に、await し忘れた処理から呼ぶと
+ * エラーになる — 書き込みが誰にも読まれず捨てられるのを知らせるため。
  *
- * @throws 予約キーを含むとき。runWithContext の外で呼んだとき
+ * @throws 予約キーを含むとき。runWithContext の外、または終わった範囲で呼んだとき
  */
 export declare function setContext(values: Record<string, unknown>): void;
 /**

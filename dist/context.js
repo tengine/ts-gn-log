@@ -47,6 +47,9 @@ function requireScope(fn) {
     if (scope === undefined) {
         throw new Error(`${fn}() must be called inside runWithContext() (Route Handler なら withRequestTrace で囲う)`);
     }
+    if (scope.closed) {
+        throw new Error(`${fn}() was called after its runWithContext() scope ended (await し忘れた処理からの更新)`);
+    }
     return scope;
 }
 function validateKeys(values) {
@@ -69,14 +72,39 @@ export function getContext() {
  */
 export function runWithContext(values, fn) {
     validateKeys(values);
-    const scope = { values: Object.freeze({ ...getContext(), ...values }) };
-    return storage.run(scope, fn);
+    const scope = { values: Object.freeze({ ...getContext(), ...values }), closed: false };
+    const close = () => {
+        scope.closed = true;
+    };
+    let result;
+    try {
+        result = storage.run(scope, fn);
+    }
+    catch (e) {
+        close();
+        throw e;
+    }
+    if (isPromiseLike(result)) {
+        // 範囲は fn が返した Promise が settle するまで。settle 後の更新は受け付けない
+        result.then(close, close);
+    }
+    else {
+        close();
+    }
+    return result;
+}
+function isPromiseLike(value) {
+    return (typeof value === "object" &&
+        value !== null &&
+        typeof value.then === "function");
 }
 /**
  * いちばん内側の runWithContext の範囲に値を足す。その範囲が終わるまで (await 先、
  * コールバックの中も含めて) 残り、範囲を抜けると消える。runWithContext の外では使えない。
+ * 範囲が終わった後 (fn が返した Promise の settle 後) に、await し忘れた処理から呼ぶと
+ * エラーになる — 書き込みが誰にも読まれず捨てられるのを知らせるため。
  *
- * @throws 予約キーを含むとき。runWithContext の外で呼んだとき
+ * @throws 予約キーを含むとき。runWithContext の外、または終わった範囲で呼んだとき
  */
 export function setContext(values) {
     validateKeys(values);
