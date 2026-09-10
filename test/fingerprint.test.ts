@@ -38,6 +38,21 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
 
   it("maxLength を指定できる", () => {
     expect(normalizeMessage("abcdef", 3)).toBe("abc");
+    expect(normalizeMessage("abcdef", 0)).toBe("");
+    expect(normalizeMessage("", 0)).toBe("");
+    expect(normalizeMessage("abc", 10)).toBe("abc");
+  });
+
+  it("負の maxLength は末尾から削る (Python の s[:negative] と同じ)", () => {
+    expect(normalizeMessage("abcdef", -2)).toBe("abcd");
+    expect(normalizeMessage("abcdef", -1)).toBe("abcde");
+    expect(normalizeMessage("a😀b😀c", -2)).toBe("a😀b");
+    expect(normalizeMessage("ab", -5)).toBe("");
+  });
+
+  it("巨大なメッセージ (10MB) でも配列に展開せず切り詰める", () => {
+    const big = "x".repeat(10 * 1024 * 1024);
+    expect(Array.from(normalizeMessage(big))).toHaveLength(300);
   });
 
   it("切り詰めの単位はコードポイント (BMP 外の文字を分断しない。py-gn-log #26 の案 1)", () => {

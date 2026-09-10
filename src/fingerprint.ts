@@ -64,10 +64,32 @@ export function normalizeMessage(message: string, maxLength: number = MAX_MESSAG
   return truncateCodePoints(normalized, maxLength);
 }
 
-/** 先頭 maxLength コードポイントに切り詰める (サロゲートペアを分断しない) */
+/**
+ * 先頭 maxLength コードポイントに切り詰める (サロゲートペアを分断しない)。
+ * 負の maxLength は Python の `s[:negative]` と同じく末尾から削る。
+ *
+ * 入力を配列に展開しない — 数十 MB のメッセージを `Array.from` に通すとヒープを使い切り、
+ * catch できない fatal OOM でプロセスが落ちるため。UTF-16 コード単位の数はコードポイント数
+ * 以上なので、まず `s.length` で切り詰めが要るかを判定し、要るときだけ必要な分を走査する。
+ */
 function truncateCodePoints(s: string, maxLength: number): string {
-  const chars = Array.from(s);
-  return chars.length <= maxLength ? s : chars.slice(0, maxLength).join("");
+  if (maxLength >= 0 && s.length <= maxLength) return s;
+  let keep = maxLength;
+  if (maxLength < 0) {
+    // 末尾から削るには全体のコードポイント数が要る。数え上げも配列を作らずに行う
+    let total = 0;
+    for (const _ch of s) total += 1;
+    keep = total + maxLength;
+  }
+  if (keep <= 0) return "";
+  let out = "";
+  let count = 0;
+  for (const ch of s) {
+    if (count === keep) break;
+    out += ch;
+    count += 1;
+  }
+  return out;
 }
 
 /** 連結の区切り文字 `|` が値に含まれていても区切りと区別できるように escape する */
