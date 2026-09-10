@@ -57,6 +57,13 @@ export declare function newSpanId(): string;
 export declare function currentTrace(context?: Context): TraceContext | undefined;
 export declare function isTraceContext(value: unknown): value is TraceContext;
 /**
+ * 外から来た TraceContext を正規化する (入口の 1 か所で検証し、以降はこの形を信用する)。
+ * traceId が 32 桁の 16 進でなければ undefined (trace 無し)。spanId は 16 桁の 16 進で
+ * なければ落とし、sampled は boolean でなければ落とす。大文字は小文字にする。
+ * 解析 (parseTraceparent / parseCloudTraceContext) の出力は既にこの形。
+ */
+export declare function normalizeTrace(value: unknown): TraceContext | undefined;
+/**
  * fn の間だけ trace を文脈に置く (py-gn-log の trace.bind と対)。fields はあわせて文脈に置く
  * ログ用のフィールド (provider が組み立てる)。trace が undefined なら fields も置かず fn を呼ぶ。
  */
