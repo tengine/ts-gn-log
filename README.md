@@ -10,14 +10,14 @@ py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS �
 
 | サブパス | 役割 | 状態 |
 |---|---|---|
-| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | 空 (機能を足す PR で埋める) |
+| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `level` / `output` を再輸出 |
 | `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 未実装 |
 | `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 未実装 |
-| `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 未実装 |
-| `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し | 未実装 |
+| `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 実装済み |
+| `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し、Logger の核 | 実装済み |
 | `ts-gn-log/trace` | W3C Trace Context (`traceparent`) の解釈・組み立てと、現在の trace の保持 | 未実装 |
-| `ts-gn-log/google/cloud-run` | **Cloud Run 向けの入口** `createLogger()` と `isCloudRun()` | 未実装 |
-| `ts-gn-log/google/cloud-logging` | Cloud Logging 向けの JSON 整形 (severity / labels / stack_trace / fingerprint) | 未実装 |
+| `ts-gn-log/google/cloud-run` | **Cloud Run 向けの入口** `createLogger()` と `isCloudRun()` | 実装済み |
+| `ts-gn-log/google/cloud-logging` | Cloud Logging 向けの JSON 整形 (severity / labels / stack_trace / fingerprint) | 実装済み (fingerprint は未実装) |
 | `ts-gn-log/google/cloud-trace` | `X-Cloud-Trace-Context` の解釈と Cloud Logging の特殊フィールド (`logging.googleapis.com/trace` 等) | 未実装 |
 
 ## インストール
@@ -42,7 +42,36 @@ npm install github:tengine/ts-gn-log#v0.1.0
 
 ## 使い方
 
-(機能を足す PR で書く)
+### 基本的な使い方
+
+入口は `ts-gn-log/google/cloud-run` の `createLogger()` です。プロセスで 1 回呼び、返ったロガーを使います (py-gn-log の `setup_logging()` に相当)。Cloud Run 上では Cloud Logging 向けの JSON 行、ローカルでは人が読む text 形式を、`console` を経由せず stdout / stderr に書きます (severity が ERROR 以上なら stderr、それ以外は stdout)。
+
+```ts
+import { createLogger } from "ts-gn-log/google/cloud-run";
+
+const log = createLogger({
+  name: "bff",                        // 全行の name
+  labels: { service: "frontend" },    // logging.googleapis.com/labels (JSON 形式のみ)
+  // level: "INFO",                   // 省略時は LOG_LEVEL、無ければ INFO
+  // json: true,                      // 省略時は GNLOG_FORMAT、無ければ Cloud Run 上なら JSON
+});
+
+log.info("task accepted", { site: "site-a", operation: "POST /api/v1/things" });
+log.error("save failed", { err, error_type: "infra", operation: "save_result" });
+
+const siteLog = log.child({ site: "site-a" }); // 固定フィールドを持つ子ロガー
+siteLog.warn("retrying");
+```
+
+Cloud Run 上の出力 (1 行の JSON):
+
+```json
+{"site":"site-a","operation":"POST /api/v1/things","severity":"INFO","message":"task accepted","timestamp":"2026-09-09T01:23:45.678Z","name":"bff","logging.googleapis.com/labels":{"service":"frontend"}}
+```
+
+- 呼び出し時のフィールドはそのまま JSON のキーになります。キー名は py-gn-log の `extra` と同じく snake_case を推奨します。`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` と同名のフィールドは固定の値が勝ちます
+- `err` だけは特別で、severity が ERROR 以上なら `stack_trace` (Error Reporting が認識するフィールド) に、WARNING 以下なら `error` に、その文字列 (Error なら `stack`) が入ります。`err` は Error でなくても構いません (文字列などはそのまま入り、`message` は変わりません)
+- ローカルの text 形式は `2026-09-09T01:23:45.678Z INFO     bff  task accepted  {"site":"site-a"}` の 1 行で、`err` があれば次の行以降に stack が続きます。書式は固定です
 
 ## 環境変数
 

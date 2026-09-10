@@ -31,3 +31,93 @@ describe("isCloudRun", () => {
     }
   });
 });
+
+import { CLOUD_LOGGING_LABELS_KEY } from "../../src/google/cloud-logging.js";
+import { createLogger, useJsonOutput } from "../../src/google/cloud-run.js";
+import { collect } from "../helpers.js";
+
+describe("useJsonOutput (Cloud Run 向け)", () => {
+  it("引数 > GNLOG_FORMAT > Cloud Run 上かどうか", () => {
+    expect(useJsonOutput(false, { K_SERVICE: "bff" })).toBe(false);
+    expect(useJsonOutput(undefined, { K_SERVICE: "bff", GNLOG_FORMAT: "text" })).toBe(false);
+    expect(useJsonOutput(undefined, { K_SERVICE: "bff" })).toBe(true);
+    expect(useJsonOutput(undefined, {})).toBe(false);
+    expect(useJsonOutput(undefined, { GNLOG_FORMAT: "json" })).toBe(true);
+  });
+});
+
+describe("createLogger", () => {
+  it("Cloud Run 相当の環境変数があれば JSON 行 (設計案 §2.1 のキー)", () => {
+    const out = collect();
+    const log = createLogger({
+      name: "bff",
+      labels: { service: "frontend" },
+      env: { K_SERVICE: "bff" },
+      write: out.write,
+    });
+    log.info("task accepted", { site: "site-a" });
+    const entry = JSON.parse(out.lines[0]?.line ?? "null");
+    expect(entry).toMatchObject({
+      severity: "INFO",
+      message: "task accepted",
+      name: "bff",
+      site: "site-a",
+      [CLOUD_LOGGING_LABELS_KEY]: { service: "frontend" },
+    });
+    expect(entry.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  it("Cloud Run 外は text 形式", () => {
+    const out = collect();
+    const log = createLogger({ name: "bff", env: {}, write: out.write });
+    log.info("hello");
+    expect(out.lines[0]?.line).toMatch(/^\d{4}-.*Z INFO {5}bff {2}hello$/);
+  });
+
+  it("json 引数と GNLOG_FORMAT で形式を強制できる", () => {
+    const out = collect();
+    createLogger({ name: "bff", env: {}, json: true, write: out.write }).info("a");
+    createLogger({ name: "bff", env: { GNLOG_FORMAT: "json" }, write: out.write }).info("b");
+    createLogger({
+      name: "bff",
+      env: { K_SERVICE: "x", GNLOG_FORMAT: "text" },
+      write: out.write,
+    }).info("c");
+    expect(out.lines.map((l) => l.line.startsWith("{"))).toEqual([true, true, false]);
+  });
+
+  it("GNLOG_FORMAT が不正なら createLogger がエラーを投げる", () => {
+    expect(() => createLogger({ name: "bff", env: { GNLOG_FORMAT: "yaml" } })).toThrow(
+      /GNLOG_FORMAT/,
+    );
+  });
+
+  it("level は引数 > LOG_LEVEL > INFO", () => {
+    const out = collect();
+    createLogger({ name: "bff", env: { LOG_LEVEL: "DEBUG" }, write: out.write }).debug("shown");
+    createLogger({ name: "bff", env: {}, write: out.write }).debug("hidden");
+    createLogger({
+      name: "bff",
+      env: { LOG_LEVEL: "DEBUG" },
+      level: "ERROR",
+      write: out.write,
+    }).info("hidden");
+    expect(out.lines.map((l) => l.line.endsWith("shown"))).toEqual([true]);
+  });
+
+  it("fields は全行に付き、child でさらに重ねられる", () => {
+    const out = collect();
+    const log = createLogger({
+      name: "bff",
+      env: { K_SERVICE: "x" },
+      fields: { app: "a" },
+      write: out.write,
+    });
+    log.child({ site: "s" }).warn("w");
+    expect(JSON.parse(out.lines[0]?.line ?? "null")).toMatchObject({
+      app: "a",
+      site: "s",
+      severity: "WARNING",
+    });
+  });
+});
