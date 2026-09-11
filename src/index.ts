@@ -6,6 +6,7 @@
  */
 
 export * from "./context.js";
+export * from "./fingerprint.js";
 export * from "./level.js";
 export * from "./output.js";
 export * from "./trace.js";

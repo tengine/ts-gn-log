@@ -110,7 +110,9 @@ function validateKeys(values: Record<string, unknown>): void {
 
 /**
  * 動的な値 (利用側の関数の返り値など) を、予約キーを落として ContextFields にする。
- * オブジェクト以外 (null / 配列 / 文字列) は undefined。投げない — 利用側の関数を境界で
+ * `typeof value !== "object" || value === null || Array.isArray(value)` なら undefined
+ * (投げない)。この判定を散文で言い換えた記述はここ以外に置かない — 受け付ける値の一覧は
+ * test/context-types.test.ts が TYPEOF_SPACE の表で検証する。利用側の関数を境界で
  * 受ける側 (withRequestTrace など) が使う。runWithContext / setContext の直接呼び出しは
  * 型で弾き、動的な値は実行時のエラーで知らせる (こちらは投げてよい)。
  */

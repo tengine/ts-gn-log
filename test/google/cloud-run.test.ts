@@ -9,7 +9,7 @@ describe("isCloudRun", () => {
     expect(isCloudRun({ CLOUD_RUN_WORKER_POOL: "worker" })).toBe(true);
   });
 
-  it("値が空文字列でも、存在すれば真 (py-gn-log の != None と同じ判定)", () => {
+  it("値が空文字列でも、存在すれば真 (py-gn-log の os.getenv(name) is not None と同じ判定)", () => {
     expect(isCloudRun({ K_SERVICE: "" })).toBe(true);
   });
 
@@ -34,7 +34,7 @@ describe("isCloudRun", () => {
 
 import { CLOUD_LOGGING_LABELS_KEY } from "../../src/google/cloud-logging.js";
 import { createLogger, useJsonOutput } from "../../src/google/cloud-run.js";
-import { collect } from "../helpers.js";
+import { collect, typeofRows } from "../helpers.js";
 
 describe("useJsonOutput (Cloud Run 向け)", () => {
   it("引数 > GNLOG_FORMAT > Cloud Run 上かどうか", () => {
@@ -116,55 +116,89 @@ describe("createLogger", () => {
     expect(log.level).toBe("INFO");
   });
 
-  it("level に文字列以外 (null / 数値 / 配列) が来ても投げず、INFO に倒す", () => {
-    for (const bogus of [null, 20, ["ERROR"], { level: "ERROR" }]) {
-      const out = collect();
-      const log = createLogger({
-        name: "bff",
-        env: {},
-        level: bogus as unknown as "INFO",
-        json: true,
-        write: out.write,
-      });
-      expect(log.level).toBe("INFO");
-      log.critical("shown");
-      expect(out.lines).toHaveLength(1);
-    }
+  it.each(
+    typeofRows<"LOG_LEVEL を見る" | "INFO に倒す (投げない)">({
+      undefined: "LOG_LEVEL を見る",
+      null: "INFO に倒す (投げない)",
+      boolean: "INFO に倒す (投げない)",
+      number: "INFO に倒す (投げない)",
+      bigint: "INFO に倒す (投げない)",
+      string: "INFO に倒す (投げない)", // "s" は未知の文字列
+      symbol: "INFO に倒す (投げない)",
+      function: "INFO に倒す (投げない)",
+      array: "INFO に倒す (投げない)",
+      "plain object": "INFO に倒す (投げない)",
+      "class instance": "INFO に倒す (投げない)",
+    }),
+  )("level に %s を渡すと %s", (_name, expected, value) => {
+    const out = collect();
+    const log = createLogger({
+      name: "bff",
+      env: { LOG_LEVEL: "DEBUG" },
+      level: value as unknown as "INFO",
+      json: true,
+      write: out.write,
+    });
+    expect(log.level).toBe(expected === "LOG_LEVEL を見る" ? "DEBUG" : "INFO");
+    log.critical("shown");
+    expect(out.lines).toHaveLength(1);
   });
 
-  it("fields にオブジェクト以外 (null / 配列 / 文字列) が来ても投げず、無視する", () => {
-    for (const bogus of [null, ["a"], "str", 1]) {
-      const out = collect();
-      const log = createLogger({
-        name: "bff",
-        env: { K_SERVICE: "x" },
-        fields: bogus as unknown as Record<string, unknown>,
-        write: out.write,
-      });
-      log.info("m");
-      const entry = JSON.parse(out.lines[0]?.line ?? "null");
-      expect(Object.keys(entry).sort()).toEqual([
-        "logging.googleapis.com/labels",
-        "message",
-        "name",
-        "severity",
-        "timestamp",
-      ]);
-    }
+  const FIXED_KEYS = ["logging.googleapis.com/labels", "message", "name", "severity", "timestamp"];
+
+  it.each(
+    typeofRows<"無視する (投げない)" | "採用する">({
+      undefined: "無視する (投げない)",
+      null: "無視する (投げない)",
+      boolean: "無視する (投げない)",
+      number: "無視する (投げない)",
+      bigint: "無視する (投げない)",
+      string: "無視する (投げない)",
+      symbol: "無視する (投げない)",
+      function: "無視する (投げない)", // 列挙可能なプロパティを持っていても通らない
+      array: "無視する (投げない)",
+      "plain object": "採用する",
+      "class instance": "採用する",
+    }),
+  )("fields に %s を渡すと %s", (_name, expected, value) => {
+    const out = collect();
+    const log = createLogger({
+      name: "bff",
+      env: { K_SERVICE: "x" },
+      fields: value as unknown as Record<string, unknown>,
+      write: out.write,
+    });
+    log.info("m");
+    const entry = JSON.parse(out.lines[0]?.line ?? "null");
+    const keys = Object.keys(entry).sort();
+    expect(keys).toEqual(expected === "採用する" ? ["a", ...FIXED_KEYS] : FIXED_KEYS);
   });
 
-  it("labels にオブジェクト以外 (null / 配列 / 文字列) が来ても投げず、無視する", () => {
-    for (const bogus of [null, ["a"], "str", 1]) {
-      const out = collect();
-      const log = createLogger({
-        name: "bff",
-        env: { K_SERVICE: "x" },
-        labels: bogus as unknown as Record<string, string>,
-        write: out.write,
-      });
-      log.info("m");
-      expect(JSON.parse(out.lines[0]?.line ?? "null")[CLOUD_LOGGING_LABELS_KEY]).toEqual({});
-    }
+  it.each(
+    typeofRows<"無視する (投げない)" | "採用する">({
+      undefined: "無視する (投げない)",
+      null: "無視する (投げない)",
+      boolean: "無視する (投げない)",
+      number: "無視する (投げない)",
+      bigint: "無視する (投げない)",
+      string: "無視する (投げない)",
+      symbol: "無視する (投げない)",
+      function: "無視する (投げない)",
+      array: "無視する (投げない)",
+      "plain object": "採用する",
+      "class instance": "採用する",
+    }),
+  )("labels に %s を渡すと %s", (_name, expected, value) => {
+    const out = collect();
+    const log = createLogger({
+      name: "bff",
+      env: { K_SERVICE: "x" },
+      labels: value as unknown as Record<string, string>,
+      write: out.write,
+    });
+    log.info("m");
+    const labels = JSON.parse(out.lines[0]?.line ?? "null")[CLOUD_LOGGING_LABELS_KEY];
+    expect(labels).toEqual(expected === "採用する" ? { a: "1" } : {});
   });
 
   it("labels の値は文字列にする (Cloud Logging の labels は文字列の map)", () => {
