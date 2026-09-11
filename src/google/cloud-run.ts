@@ -80,9 +80,9 @@ export function createLogger(options: CreateLoggerOptions): Logger {
   // 外から来る値はここで正規化する。TypeScript の型は JS からの利用や JSON.parse した設定値を守らない。
   // level: 未指定なら LOG_LEVEL、未知の文字列や文字列以外は INFO (parseLevel が 1 か所で倒す)
   const level = options.level === undefined ? levelFromEnv(env) : parseLevel(options.level);
-  // fields: オブジェクト以外 (null / 配列 / 文字列) は無視する
+  // fields: null / 配列 / プリミティブは無視する (class のインスタンスなどは通る)
   const fields = isPlainObject(options.fields) ? options.fields : undefined;
-  // labels: オブジェクト以外は無視し、値は文字列にする (Cloud Logging の labels は文字列の map)
+  // labels: null / 配列 / プリミティブは無視し、値は文字列にする (Cloud Logging の labels は文字列の map)
   const labels = isPlainObject(options.labels) ? stringValues(options.labels) : undefined;
   const projectId =
     typeof options.projectId === "string" && options.projectId !== ""

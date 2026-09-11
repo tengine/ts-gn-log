@@ -56,7 +56,7 @@ describe("予約キーは型で弾く (ContextFields)", () => {
 });
 
 describe("normalizeContextFields (利用側の関数の返り値を境界で受ける)", () => {
-  it("予約キーを落とし、プレーンなオブジェクト以外 (null / 配列 / 文字列) は undefined。投げない", () => {
+  it("予約キーを落とし、null / 配列 / プリミティブは undefined。投げない", () => {
     expect(normalizeContextFields({ message: "x", request_id: "r1" })).toEqual({
       request_id: "r1",
     });

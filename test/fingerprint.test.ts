@@ -5,7 +5,7 @@ import { buildFingerprint, normalizeMessage } from "../src/fingerprint.js";
 
 const sha1 = (s: string) => createHash("sha1").update(s, "utf8").digest("hex").slice(0, 16);
 
-describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)", () => {
+describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例を含む)", () => {
   it.each([
     ["order 123 not found", "order <num> not found"],
     ["ratio 0.75 exceeded", "ratio <num> exceeded"],
@@ -58,7 +58,7 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
     expect(normalizeMessage("abcdef", Number.NaN)).toBe("");
   });
 
-  it("数値に変換すると NaN になる maxLength は slice と同じく 0 として扱う (JS からの利用や設定値)", () => {
+  it("数値に変換すると NaN になる maxLength (undefined を除く) は slice と同じく 0 として扱う", () => {
     // 既定値 (300) との違いが出る 400 文字で確かめる (短い入力では偶然一致してしまう)
     const s = "x".repeat(400);
     for (const n of ["abc", {}, [1, 2]]) {
@@ -125,7 +125,7 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例)",
   });
 });
 
-describe("buildFingerprint (py-gn-log の test_fingerprint.py と同じ事例)", () => {
+describe("buildFingerprint (py-gn-log の test_fingerprint.py と同じ事例を含む)", () => {
   it("可変部だけが違うメッセージは同じ fingerprint", () => {
     expect(buildFingerprint("worker", "orders.create", "validation", "order 1 missing")).toBe(
       buildFingerprint("worker", "orders.create", "validation", "order 2 missing"),

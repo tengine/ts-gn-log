@@ -116,7 +116,7 @@ describe("createLogger", () => {
     expect(log.level).toBe("INFO");
   });
 
-  it("level に文字列以外 (null / 数値 / 配列) が来ても投げず、INFO に倒す", () => {
+  it("level に null / 数値 / 配列が来ても投げず、INFO に倒す (undefined は指定なしとして環境変数を見る)", () => {
     for (const bogus of [null, 20, ["ERROR"], { level: "ERROR" }]) {
       const out = collect();
       const log = createLogger({
@@ -132,7 +132,7 @@ describe("createLogger", () => {
     }
   });
 
-  it("fields にプレーンなオブジェクト以外 (null / 配列 / 文字列 / 数値) が来ても投げず、無視する", () => {
+  it("fields に null / 配列 / プリミティブ (文字列 / 数値) が来ても投げず、無視する", () => {
     for (const bogus of [null, ["a"], "str", 1]) {
       const out = collect();
       const log = createLogger({
@@ -153,7 +153,7 @@ describe("createLogger", () => {
     }
   });
 
-  it("labels にプレーンなオブジェクト以外 (null / 配列 / 文字列 / 数値) が来ても投げず、無視する", () => {
+  it("labels に null / 配列 / プリミティブ (文字列 / 数値) が来ても投げず、無視する", () => {
     for (const bogus of [null, ["a"], "str", 1]) {
       const out = collect();
       const log = createLogger({
