@@ -64,7 +64,7 @@ describe("runWithContext / getContext", () => {
     expect(getContext()).toEqual({});
   });
 
-  it("文脈の最上位のキーは書き換えられない (凍結は浅く、入れ子の値は書き換えられてログに現れる)", () => {
+  it("文脈の最上位のキーは書き換えられない (凍結は浅く、入れ子の値は getContext() 経由で書き換えられる)", () => {
     runWithContext({ k: 1, nested: { a: 1 } }, () => {
       const ctx = getContext() as { k: number; nested: { a: number } };
       expect(() => {
