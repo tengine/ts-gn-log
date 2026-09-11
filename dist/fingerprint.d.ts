@@ -69,8 +69,11 @@ export declare const NUM_PLACEHOLDER = "<num>";
  *
  * @param message 正規化するメッセージ。**大きさの上限は呼び出し側の責務** (置換が全体に走る。
  *   どれだけの大きさで落ちるかはこのモジュールの docstring 「入力の大きさ」が正本)
- * @param maxLength 切り詰めるコードポイント数。非整数は `Array.prototype.slice` と同じく
- *   整数に丸める (NaN は 0)
+ * @param maxLength 切り詰めるコードポイント数。undefined なら既定の MAX_MESSAGE_LENGTH。
+ *   それ以外は `Math.trunc` に通し、NaN は 0 にする (`Array.prototype.slice` と同じ意味論)。
+ *   bigint と symbol は `Math.trunc` が TypeError を投げる (slice も同じ)。この扱いを散文で
+ *   言い換えた記述はここ以外に置かない — 値ごとの結果は test/fingerprint.test.ts が
+ *   TYPEOF_SPACE の表で検証する
  */
 export declare function normalizeMessage(message: string, maxLength?: number): string;
 /**

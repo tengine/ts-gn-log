@@ -22,7 +22,7 @@ export interface CreateLoggerOptions {
     name: string;
     /** 全行の logging.googleapis.com/labels に入れる固定の labels (JSON 形式のみ) */
     labels?: Record<string, string>;
-    /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO。未知の値は INFO に倒す (LOG_LEVEL と同じ) */
+    /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO。値の扱いは `parseLevel` の docstring を参照 */
     level?: Level;
     /** true なら JSON、false なら text。省略時は環境変数 GNLOG_FORMAT、無ければ Cloud Run 上なら JSON */
     json?: boolean;

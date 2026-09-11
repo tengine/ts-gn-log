@@ -26,9 +26,11 @@ const ALIASES = {
 };
 /**
  * レベルの文字列 (大文字・小文字を問わない) を Level に変換する。
- * 未知の値は `defaultLevel` に倒す (py-gn-log の level.parse と同じ。エラーにしない)。
- * 文字列以外 (null / 数値 / 配列など。JS からの利用や JSON.parse した設定値) も同じく
- * `defaultLevel` に倒し、投げない — 外部から来る値の正規化はこの 1 か所で行う。
+ * `typeof s !== "string"` なら `defaultLevel` (投げない)。文字列は trim → 大文字化 → 別名表で
+ * 引き、無ければ `defaultLevel` (py-gn-log の level.parse と同じ。エラーにしない)。
+ * 外部から来る値 (JS からの利用や JSON.parse した設定値) の正規化はこの 1 か所で行い、
+ * この判定を散文で言い換えた記述はここ以外に置かない — 受け付ける値の一覧は
+ * test/level.test.ts が TYPEOF_SPACE の表で検証する。
  */
 export function parseLevel(s, defaultLevel = DEFAULT_LEVEL) {
     if (typeof s !== "string")

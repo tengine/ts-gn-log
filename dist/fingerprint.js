@@ -81,8 +81,11 @@ const NUMBER_PATTERN = /\b\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g;
  *
  * @param message 正規化するメッセージ。**大きさの上限は呼び出し側の責務** (置換が全体に走る。
  *   どれだけの大きさで落ちるかはこのモジュールの docstring 「入力の大きさ」が正本)
- * @param maxLength 切り詰めるコードポイント数。非整数は `Array.prototype.slice` と同じく
- *   整数に丸める (NaN は 0)
+ * @param maxLength 切り詰めるコードポイント数。undefined なら既定の MAX_MESSAGE_LENGTH。
+ *   それ以外は `Math.trunc` に通し、NaN は 0 にする (`Array.prototype.slice` と同じ意味論)。
+ *   bigint と symbol は `Math.trunc` が TypeError を投げる (slice も同じ)。この扱いを散文で
+ *   言い換えた記述はここ以外に置かない — 値ごとの結果は test/fingerprint.test.ts が
+ *   TYPEOF_SPACE の表で検証する
  */
 export function normalizeMessage(message, maxLength = MAX_MESSAGE_LENGTH) {
     const normalized = message
@@ -101,11 +104,10 @@ export function normalizeMessage(message, maxLength = MAX_MESSAGE_LENGTH) {
  * 全体を走るので、モジュールの docstring の「入力の大きさ」の前提は変わらない。
  */
 function truncateCodePoints(s, maxLength) {
-    // 非整数は `Array.prototype.slice` と同じ意味論で整数に丸める (NaN は 0)。Python の s[:n] は
-    // 非整数で TypeError になるので誤用の範囲だが、丸めずに走査の終了判定に使うと切り詰めが
-    // 効かなくなる (入力全体が返る) ため、ここで正規化する
+    // maxLength の値ごとの扱いは normalizeMessage の @param が正本。ここでは丸めの順序だけ:
     // Math.trunc を先に通す — Number.isNaN は型を見るので、非数値 ('abc' や {}) を先に
-    // 判定しても false になり、Math.trunc の NaN が残る
+    // 判定しても false になり、Math.trunc の NaN が残る。丸めずに走査の終了判定に使うと
+    // 切り詰めが効かなくなる (入力全体が返る)
     const truncated = Math.trunc(maxLength);
     const limit = Number.isNaN(truncated) ? 0 : truncated;
     if (limit >= 0 && s.length <= limit)
