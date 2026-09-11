@@ -64,11 +64,14 @@ describe("runWithContext / getContext", () => {
     expect(getContext()).toEqual({});
   });
 
-  it("文脈は凍結されていて、外から書き換えられない", () => {
-    runWithContext({ k: 1 }, () => {
+  it("文脈の最上位のキーは書き換えられない (凍結は浅く、入れ子の値は書き換えられてログに現れる)", () => {
+    runWithContext({ k: 1, nested: { a: 1 } }, () => {
+      const ctx = getContext() as { k: number; nested: { a: number } };
       expect(() => {
-        (getContext() as Record<string, unknown>).k = 2;
+        ctx.k = 2;
       }).toThrow();
+      ctx.nested.a = 999; // 投げない
+      expect((getContext() as { nested: { a: number } }).nested.a).toBe(999);
     });
   });
 });

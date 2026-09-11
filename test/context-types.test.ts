@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-
 import {
   type ContextFields,
   normalizeContextFields,
@@ -9,6 +8,7 @@ import {
 } from "../src/context.js";
 import { logFields } from "../src/google/cloud-trace.js";
 import { runWithTrace } from "../src/trace.js";
+import { typeofRows } from "./helpers.js";
 
 const TID = "4bf92f3577b34da6a3ce929d0e0e4736";
 
@@ -56,13 +56,30 @@ describe("予約キーは型で弾く (ContextFields)", () => {
 });
 
 describe("normalizeContextFields (利用側の関数の返り値を境界で受ける)", () => {
-  it("予約キーを落とし、null / 配列 / プリミティブは undefined。投げない", () => {
+  it("予約キーを落とす", () => {
     expect(normalizeContextFields({ message: "x", request_id: "r1" })).toEqual({
       request_id: "r1",
     });
-    expect(normalizeContextFields(null)).toBeUndefined();
-    expect(normalizeContextFields(["a"])).toBeUndefined();
-    expect(normalizeContextFields("str")).toBeUndefined();
     expect(normalizeContextFields({})).toEqual({});
+  });
+
+  it.each(
+    typeofRows<"undefined (投げない)" | "フィールドにする">({
+      undefined: "undefined (投げない)",
+      null: "undefined (投げない)",
+      boolean: "undefined (投げない)",
+      number: "undefined (投げない)",
+      bigint: "undefined (投げない)",
+      string: "undefined (投げない)",
+      symbol: "undefined (投げない)",
+      function: "undefined (投げない)",
+      array: "undefined (投げない)",
+      "plain object": "フィールドにする",
+      "class instance": "フィールドにする",
+    }),
+  )("normalizeContextFields に %s を渡すと %s", (_name, expected, value) => {
+    expect(normalizeContextFields(value)).toEqual(
+      expected === "フィールドにする" ? { a: 1 } : undefined,
+    );
   });
 });

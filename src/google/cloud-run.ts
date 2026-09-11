@@ -49,7 +49,7 @@ export interface CreateLoggerOptions {
   name: string;
   /** 全行の logging.googleapis.com/labels に入れる固定の labels (JSON 形式のみ) */
   labels?: Record<string, string>;
-  /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO。未知の値は INFO に倒す (LOG_LEVEL と同じ) */
+  /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO。値の扱いは `parseLevel` の docstring を参照 */
   level?: Level;
   /** true なら JSON、false なら text。省略時は環境変数 GNLOG_FORMAT、無ければ Cloud Run 上なら JSON */
   json?: boolean;
@@ -78,11 +78,11 @@ export function createLogger(options: CreateLoggerOptions): Logger {
   const env = options.env ?? process.env;
   const json = useJsonOutput(options.json, env);
   // 外から来る値はここで正規化する。TypeScript の型は JS からの利用や JSON.parse した設定値を守らない。
-  // level: 未指定なら LOG_LEVEL、未知の文字列や文字列以外は INFO (parseLevel が 1 か所で倒す)
+  // level: undefined なら LOG_LEVEL。それ以外の値の扱いは parseLevel
   const level = options.level === undefined ? levelFromEnv(env) : parseLevel(options.level);
-  // fields: null / 配列 / プリミティブは無視する (class のインスタンスなどは通る)
+  // fields / labels: 受け付ける値の判定は isPlainObject (下)。labels の値は文字列にする
+  // (Cloud Logging の labels は文字列の map)
   const fields = isPlainObject(options.fields) ? options.fields : undefined;
-  // labels: null / 配列 / プリミティブは無視し、値は文字列にする (Cloud Logging の labels は文字列の map)
   const labels = isPlainObject(options.labels) ? stringValues(options.labels) : undefined;
   const projectId =
     typeof options.projectId === "string" && options.projectId !== ""
@@ -103,6 +103,8 @@ export function createLogger(options: CreateLoggerOptions): Logger {
   return createCoreLogger(core);
 }
 
+// normalizeContextFields (src/context.ts) と同じ判定。受け付ける値の一覧は
+// test/google/cloud-run.test.ts が TYPEOF_SPACE の表で検証する
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

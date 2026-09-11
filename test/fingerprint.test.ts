@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-
 import { buildFingerprint, normalizeMessage } from "../src/fingerprint.js";
+import { typeofRows } from "./helpers.js";
 
 const sha1 = (s: string) => createHash("sha1").update(s, "utf8").digest("hex").slice(0, 16);
 
@@ -50,7 +50,7 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例を
     expect(normalizeMessage("ab", -5)).toBe("");
   });
 
-  it("非整数の maxLength は Array.prototype.slice と同じく整数に丸める (NaN は 0)", () => {
+  it("number 型の非整数 (2.5 / -2.5 / NaN / ±Infinity) は Array.prototype.slice と同じく丸める", () => {
     for (const n of [2.5, -2.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
       expect(normalizeMessage("abcdef", n)).toBe(Array.from("abcdef").slice(0, n).join(""));
     }
@@ -58,23 +58,47 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例を
     expect(normalizeMessage("abcdef", Number.NaN)).toBe("");
   });
 
-  it("数値に変換すると NaN になる maxLength (undefined を除く) は slice と同じく 0 として扱う", () => {
-    // 既定値 (300) との違いが出る 400 文字で確かめる (短い入力では偶然一致してしまう)
+  // 既定値 (300) との違いが出る 400 文字で確かめる (短い入力では偶然一致してしまう)
+  it.each(
+    typeofRows<"既定の 300 文字" | "0 文字" | "1 文字" | "TypeError">({
+      undefined: "既定の 300 文字",
+      null: "0 文字", // Math.trunc(null) は 0
+      boolean: "1 文字", // Math.trunc(true) は 1
+      number: "1 文字",
+      bigint: "TypeError", // Math.trunc が投げる (slice も同じ)
+      string: "0 文字", // "s" は NaN → 0
+      symbol: "TypeError",
+      function: "0 文字",
+      array: "0 文字", // ["a"] は NaN → 0
+      "plain object": "0 文字",
+      "class instance": "0 文字",
+    }),
+  )("maxLength に %s を渡すと %s", (_name, expected, value) => {
     const s = "x".repeat(400);
-    for (const n of ["abc", {}, [1, 2]]) {
-      const value = n as unknown as number;
-      expect(normalizeMessage(s, value)).toBe("");
-      expect(normalizeMessage(s, value)).toBe(Array.from(s).slice(0, value).join(""));
+    const n = value as unknown as number;
+    if (expected === "TypeError") {
+      expect(() => normalizeMessage(s, n)).toThrow(TypeError);
+      expect(() => Array.from(s).slice(0, n)).toThrow(TypeError);
+      return;
+    }
+    const length = { "既定の 300 文字": 300, "0 文字": 0, "1 文字": 1 }[expected];
+    expect(normalizeMessage(s, n)).toHaveLength(length);
+    if (expected !== "既定の 300 文字") {
+      expect(normalizeMessage(s, n)).toBe(Array.from(s).slice(0, n).join(""));
     }
   });
 
-  it("数値に変換できる maxLength は slice と同じくその数として扱う ('5'、['5']、valueOf を持つ値、null は 0)", () => {
+  it('"5" / ["5"] / valueOf を持つオブジェクトは Number() の結果 (5 / 5 / 7) で切り詰める', () => {
     const s = "x".repeat(400);
-    for (const n of ["5", ["5"], { valueOf: () => 7 }, null]) {
+    for (const [n, length] of [
+      ["5", 5],
+      [["5"], 5],
+      [{ valueOf: () => 7 }, 7],
+    ] as const) {
       const value = n as unknown as number;
+      expect(normalizeMessage(s, value)).toHaveLength(length);
       expect(normalizeMessage(s, value)).toBe(Array.from(s).slice(0, value).join(""));
     }
-    expect(normalizeMessage(s, "5" as unknown as number)).toHaveLength(5);
   });
 
   it("maxLength を省略する / undefined を渡すと既定の 300 が使われる", () => {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { LEVELS } from "../src/level.js";
+
 import { createCoreLogger, textFormat } from "../src/output.js";
 import { collect, FIXED_TIME } from "./helpers.js";
 
@@ -36,19 +38,19 @@ describe("textFormat (ローカル向け)", () => {
     expect(last()).toBe('2026-09-09T01:23:45.678Z INFO     bff  m  {"site":"a","n":1}');
   });
 
-  it("err があれば次の行以降に stack を続ける (5 つのレベルすべて)", () => {
+  it("err があれば次の行以降に stack を続ける (LEVELS の全値を回す)", () => {
     const { log, last } = makeLogger();
     const err = new Error("boom");
-    const severities = {
-      debug: "DEBUG   ",
-      info: "INFO    ",
-      warn: "WARNING ",
-      error: "ERROR   ",
-      critical: "CRITICAL",
+    const methods = {
+      DEBUG: "debug",
+      INFO: "info",
+      WARNING: "warn",
+      ERROR: "error",
+      CRITICAL: "critical",
     } as const;
-    for (const [method, severity] of Object.entries(severities)) {
-      log[method as keyof typeof severities]("m", { err });
-      expect(last()).toBe(`2026-09-09T01:23:45.678Z ${severity} bff  m\n${err.stack}`);
+    for (const level of LEVELS) {
+      log[methods[level]]("m", { err });
+      expect(last()).toBe(`2026-09-09T01:23:45.678Z ${level.padEnd(8)} bff  m\n${err.stack}`);
     }
     log.error("failed", { err: "plain" });
     expect(last()).toBe("2026-09-09T01:23:45.678Z ERROR    bff  failed\nplain");
