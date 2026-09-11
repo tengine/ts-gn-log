@@ -67,8 +67,8 @@ export declare const NUM_PLACEHOLDER = "<num>";
  * @example
  * normalizeMessage('order 123 for "alice" not found') // => 'order <num> for <str> not found'
  *
- * @param message 正規化するメッセージ。**大きさの上限は呼び出し側の責務** (置換が全体に走るので、
- *   数十 MB では fatal OOM でプロセスが落ちる)
+ * @param message 正規化するメッセージ。**大きさの上限は呼び出し側の責務** (置換が全体に走る。
+ *   どれだけの大きさで落ちるかはこのモジュールの docstring 「入力の大きさ」が正本)
  * @param maxLength 切り詰めるコードポイント数。非整数は `Array.prototype.slice` と同じく
  *   整数に丸める (NaN は 0)
  */
