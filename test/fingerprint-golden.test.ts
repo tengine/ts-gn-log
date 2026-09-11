@@ -24,7 +24,7 @@ const golden: Golden = JSON.parse(
   readFileSync(new URL("./fixtures/fingerprint-golden.json", import.meta.url), "utf8"),
 );
 
-describe(`fingerprint のゴールデンベクタ (py-gn-log ${golden.source.commit})`, () => {
+describe("fingerprint のゴールデンベクタ (test/fixtures/fingerprint-golden.json) と一致する", () => {
   it("前提 (切り詰めの長さと単位) が一致する", () => {
     expect(golden.max_message_length).toBe(MAX_MESSAGE_LENGTH);
     expect(golden.truncation_unit).toMatch(/code points/);
