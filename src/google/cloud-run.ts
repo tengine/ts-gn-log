@@ -29,7 +29,7 @@ const CLOUD_RUN_ENV_VARS = ["K_SERVICE", "CLOUD_RUN_JOB", "CLOUD_RUN_WORKER_POOL
 /**
  * Cloud Run (Service / Job / Worker Pool) 上で実行されているかを判定する。
  *
- * py-gn-log の `is_cloud_run()` と同じく、3 つの環境変数のいずれかが存在する
+ * py-gn-log の `is_cloud_run()` と同じく、CLOUD_RUN_ENV_VARS の環境変数のいずれかが存在する
  * (値が空文字列でも存在すれば真) ことで判定する。
  */
 export function isCloudRun(env: Env = process.env): boolean {
