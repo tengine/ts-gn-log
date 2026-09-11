@@ -92,14 +92,15 @@ describe("createCoreLogger の固定フィールド", () => {
 describe("writeToStdio", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("ERROR 以上は stderr、それ以外は stdout に改行付きで書く", () => {
+  it("ERROR 以上は stderr、それ以外は stdout に改行付きで書く (5 つのレベルすべて)", () => {
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    writeToStdio("DEBUG", "z");
     writeToStdio("INFO", "a");
     writeToStdio("WARNING", "b");
     writeToStdio("ERROR", "c");
     writeToStdio("CRITICAL", "d");
-    expect(stdout.mock.calls.map((c) => c[0])).toEqual(["a\n", "b\n"]);
+    expect(stdout.mock.calls.map((c) => c[0])).toEqual(["z\n", "a\n", "b\n"]);
     expect(stderr.mock.calls.map((c) => c[0])).toEqual(["c\n", "d\n"]);
   });
 });

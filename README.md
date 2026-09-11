@@ -149,7 +149,7 @@ buildFingerprint("worker", "orders.create", "validation", "order 123 missing");
 **残る 2 つの限界 (孤立サロゲート、入力の大きさ) の正本は [`src/fingerprint.ts`](src/fingerprint.ts) の docstring です。** ここには要点だけを書きます。
 
 - **孤立サロゲート**: ts 側は U+FFFD に置き換えて値を返します (投げません)。py-gn-log と値が一致するかは、孤立サロゲートが正規化と切り詰めの後にも残る位置にあるかで決まります。py 側で何が起きるかは前提にしないでください (py-gn-log #34 で未決)。
-- **入力の大きさ**: 置換は入力の全体に走るので、入力の大きさに比例したメモリを使います。**上限は呼び出し側の責務です** (py-gn-log #35 で未決)。ログの経路では PR 7 の `errorEvent` で上限を持ちます (この PR の時点では未実装)。
+- **入力の大きさ**: 置換は入力の全体に走るので、入力の大きさに比例したメモリを使います。十分に大きな入力では `try`/`catch` で受けられない fatal OOM でプロセスが落ちます (落ちる大きさはヒープの設定次第。実測値は docstring にあります)。**上限は呼び出し側の責務です** (py-gn-log #35 で未決)。ログの経路では PR 7 の `errorEvent` で上限を持ちます (この PR の時点では未実装)。
 
 両言語で同じ値になることは、py-gn-log の Python 実装から生成したゴールデンベクタ (`test/fixtures/fingerprint-golden.json`) で検証しています。正規化、`maxLength` を振った切り詰め (負の値と 0 を含む)、fingerprint の 3 つの軸を持ちます。規則を変えたときは py-gn-log の環境で再生成します:
 
