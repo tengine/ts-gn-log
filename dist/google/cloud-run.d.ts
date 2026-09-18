@@ -28,6 +28,11 @@ export interface CreateLoggerOptions {
     json?: boolean;
     /** 全行に付く固定フィールド */
     fields?: Record<string, unknown>;
+    /**
+     * logging.googleapis.com/trace の組み立てに使うプロジェクト ID。省略時は環境変数
+     * GOOGLE_CLOUD_PROJECT、それも無ければ trace のフィールドを付けない (既定値を持たない)
+     */
+    projectId?: string;
     /** 書き出し先の差し替え (テスト用)。省略時は stdout / stderr */
     write?: Writer;
     /** 環境変数の差し替え (テスト用)。省略時は process.env */

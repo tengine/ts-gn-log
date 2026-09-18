@@ -208,6 +208,9 @@ describe("予約キー", () => {
       "timestamp",
       "name",
       "logging.googleapis.com/labels",
+      "logging.googleapis.com/trace",
+      "logging.googleapis.com/spanId",
+      "logging.googleapis.com/trace_sampled",
       "stack_trace",
       "err",
     ]) {

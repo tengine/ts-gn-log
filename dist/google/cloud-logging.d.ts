@@ -17,12 +17,19 @@ export declare const FIELDS_ERROR_KEY = "fields_error";
 export interface JsonFormatOptions {
     /** 全行の logging.googleapis.com/labels に入れる固定の labels */
     labels?: Record<string, string>;
+    /**
+     * logging.googleapis.com/trace の組み立てに使うプロジェクト ID。無ければ、文脈に trace が
+     * あっても trace のフィールドを付けない (設計案 §2.2。既定値を持たない)
+     */
+    projectId?: string;
 }
 /**
  * Cloud Logging 向けの JSON 行を作る Formatter。
  *
  * 全行に `severity` / `message` / `timestamp` (ISO 8601 UTC) / `name` /
  * `logging.googleapis.com/labels` を付け、呼び出し時のフィールドをそのまま並べる。
+ * 文脈に trace があり projectId が分かれば `logging.googleapis.com/trace` / `spanId` /
+ * `trace_sampled` を付ける。
  * これらの固定キーと同名のフィールドは固定キーが勝つ。
  *
  * フィールドに循環参照や BigInt があっても行を出し (循環は "[Circular]"、BigInt は文字列)、

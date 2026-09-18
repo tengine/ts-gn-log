@@ -8,3 +8,4 @@
 export * from "./context.js";
 export * from "./level.js";
 export * from "./output.js";
+export * from "./trace.js";

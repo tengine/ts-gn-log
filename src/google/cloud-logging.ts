@@ -8,6 +8,8 @@
 
 import { isEnabled } from "../level.js";
 import { describeError, type Formatter, type LogRecord, tryStringify } from "../output.js";
+import { currentTrace } from "../trace.js";
+import { logFields } from "./cloud-trace.js";
 
 /** Cloud Logging の labels フィールドのキー */
 export const CLOUD_LOGGING_LABELS_KEY = "logging.googleapis.com/labels";
@@ -24,6 +26,11 @@ export const FIELDS_ERROR_KEY = "fields_error";
 export interface JsonFormatOptions {
   /** 全行の logging.googleapis.com/labels に入れる固定の labels */
   labels?: Record<string, string>;
+  /**
+   * logging.googleapis.com/trace の組み立てに使うプロジェクト ID。無ければ、文脈に trace が
+   * あっても trace のフィールドを付けない (設計案 §2.2。既定値を持たない)
+   */
+  projectId?: string;
 }
 
 /**
@@ -31,6 +38,8 @@ export interface JsonFormatOptions {
  *
  * 全行に `severity` / `message` / `timestamp` (ISO 8601 UTC) / `name` /
  * `logging.googleapis.com/labels` を付け、呼び出し時のフィールドをそのまま並べる。
+ * 文脈に trace があり projectId が分かれば `logging.googleapis.com/trace` / `spanId` /
+ * `trace_sampled` を付ける。
  * これらの固定キーと同名のフィールドは固定キーが勝つ。
  *
  * フィールドに循環参照や BigInt があっても行を出し (循環は "[Circular]"、BigInt は文字列)、
@@ -64,6 +73,9 @@ export function jsonFormat(options: JsonFormatOptions = {}): Formatter {
       const key = isEnabled(record.level, "ERROR") ? STACK_TRACE_KEY : ERROR_KEY;
       entry[key] = describeError(record.err);
     }
+    // 文脈の trace (予約キー) を Cloud Logging の特殊フィールドに変換する (設計案 §2.2)
+    const trace = currentTrace(record.context);
+    if (trace !== undefined) Object.assign(entry, logFields(trace, options.projectId));
     return entry;
   };
   return (record: LogRecord): string => {
