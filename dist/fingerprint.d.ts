@@ -21,8 +21,8 @@
  *        `\b` / `\d`) を `<num>` に
  *   2. 先頭 MAX_MESSAGE_LENGTH (300) に切り詰める。単位は Unicode のコードポイントで、
  *      サロゲートペアを分断しない (Python の len() / スライスと同じ。JavaScript の .length /
- *      .slice() は UTF-16 コード単位なので使わない)。py-gn-log との契約としてこの単位に
- *      揃えることは py-gn-log #26 で提案中 (ts-gn-log 側はコードポイント単位で実装済み)
+ *      .slice() は UTF-16 コード単位なので使わない)。py-gn-log との契約としての扱いは
+ *      py-gn-log #26
  *   3. surface / operation / error_type / 正規化したメッセージのそれぞれについて `\` を `\\` に、
  *      `|` を `\|` に escape してから `|` で連結する。切り詰め (2) の後に escape するので、
  *      escape で増えた文字は切り詰めの長さに影響しない
