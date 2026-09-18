@@ -54,12 +54,18 @@ py-gn-log (`e7119631`) の実出力と、利用プロジェクト A の自前実
 | `stack_trace` | `err.stack` | Error Reporting が認識するフィールド名。py-gn-log PR #9 と同じく ERROR 以上のみ |
 | 任意 (`errorEvent` を有効にしたとき、py-gn-log #18) | `event` (固定名) / `error_type` (未指定 `unknown`) / `operation` (未指定はロガー名) / `fingerprint` | 既定では付けない。利用側が現行の挙動を保ちたいときだけ有効化する |
 
-`fingerprint` の規則は py-gn-log #18 (main にマージ済み) と共有する。py-gn-log 側の挙動の正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」と `src/gnlog/fingerprint.py`、ts-gn-log 側の利用者に向けた挙動・制限・注意の正本は ts-gn-log の README「ERROR のログを同種ごとにまとめる fingerprint」。**正規化とハッシュの規則そのものは `src/fingerprint.ts` の docstring が正本** (判定の 3 つのパターンの隣にあり、式を引用して書いてある)。この項と README はそこへの参照にする。ゴールデンベクタは py-gn-log の実装から生成スクリプト (test/fixtures/generate-fingerprint-golden.py) で作り、両言語で一致を検証する。「300 文字」の単位 (コードポイントか UTF-16 コード単位か) は py-gn-log #26 で未決で、ts-gn-log の実装時にコードポイント単位で揃える案を #26 に出す。(5) 入力の上限 (**この項がこの決定の正本。他の文書はここへの参照にする**): ts-gn-log の `errorEvent` (PR 7 で実装) は、正規化の**前**のメッセージが 10,000 コードポイントを超えるとき fingerprint を付けず、行は出す。置換が入力の全体に走るため、上限が無いと巨大な入力でプロセスが落ちる (Node は catch できない fatal OOM)。2026-09-11 に ts-gn-log 側で決めた値で、py-gn-log には実装後に #35 の本文で同じ値と挙動を提案する。py-gn-log が合意した時点で両言語の契約になる (合意前は ts-gn-log だけの決定)。切り詰めではなく「付けない」にするのは、正規化の前に切ると引用文字列が切断位置をまたいだときに先頭 300 の結果が変わり、両言語の値がずれうるため。
+`fingerprint` の規則は py-gn-log #18 (main にマージ済み) と共有する。py-gn-log 側の挙動の正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」と `src/gnlog/fingerprint.py`、ts-gn-log 側の利用者に向けた挙動・制限・注意の正本は ts-gn-log の README「ERROR のログを同種ごとにまとめる fingerprint」。**正規化とハッシュの規則そのものは `src/fingerprint.ts` の docstring が正本** (判定の 3 つのパターンの隣にあり、式を引用して書いてある)。この項と README はそこへの参照にする。ゴールデンベクタは py-gn-log の実装から生成スクリプト (test/fixtures/generate-fingerprint-golden.py) で作り、両言語で一致を検証する。「300 文字」の単位は py-gn-log #26 で扱う。
 
 ### 2.4 py-gn-log 側に変更を求めるもの
 
 - ~~`stack_info: null` が常に付く (`gnlog.google.cloud_logging.JsonFormatter.parse()` に `stack_info` を含めているため)。ts 側では出さないので、py 側で外すか、両方で出すかを決める必要がある~~ → 決着 (2026-09-10): `stack_info` は §2 冒頭の 4 種類のどれにも当たらない (Google が読まず、値は常に `null` で、クエリにも集計にも使わない) ので、揃える対象ではない。py-gn-log には変更を求めず、ts 側は出さない
 - キー名の snake_case (`error_type` / `trace_id`) は py-gn-log の `extra` の流儀に従う。利用プロジェクト A の現行 camelCase (`traceId` / `errorType`) は ts-gn-log では採らない
+
+### 2.5 fingerprint を付けない入力の上限
+
+**この節がこの決定の正本。他の文書はここへの参照にする。**
+
+ts-gn-log の `errorEvent` (PR 7 で実装) は、正規化の**前**のメッセージが 10,000 コードポイントを超えるとき fingerprint を付けず、行は出す。置換が入力の全体に走るため、上限が無いと巨大な入力でプロセスが落ちる (Node は catch できない fatal OOM)。2026-09-11 に ts-gn-log 側で決めた値。py-gn-log 側の扱いは py-gn-log #35 に委ねる。切り詰めではなく「付けない」にするのは、正規化の前に切ると引用文字列が切断位置をまたいだときに先頭 300 の結果が変わり、両言語の値がずれうるため。
 
 ## 3. API 案
 
