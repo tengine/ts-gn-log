@@ -1,11 +1,8 @@
 """fingerprint のゴールデンベクタを py-gn-log の Python 実装から生成する
 
 値は py-gn-log の実装 (src/gnlog/fingerprint.py) から採る。このスクリプトを py-gn-log の環境で
-実行し、出力を test/fixtures/fingerprint-golden.json に書く
-(README の「ERROR のログを同種ごとにまとめる fingerprint」の節を参照)。
-
-    cd ../py-gn-log && uv run python ../ts-gn-log/test/fixtures/generate-fingerprint-golden.py \
-        "$(git rev-parse --short HEAD)" > ../ts-gn-log/test/fixtures/fingerprint-golden.json
+実行し、出力を test/fixtures/fingerprint-golden.json に書く。実行するコマンドは README の
+「ERROR のログを同種ごとにまとめる fingerprint」の節を参照。
 """
 
 import json
