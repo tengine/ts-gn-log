@@ -128,7 +128,7 @@ export const POST = withRequestTrace(async (req) => { ... }) // Next.js Route Ha
 
 py-gn-log と同じく **npm には公開せず、public リポジトリを git 参照**で使う (`"ts-gn-log": "github:tengine/ts-gn-log#v0.1.0"`。tag か SHA で版を固定)。利用側の `npm ci` は Docker ビルド (Cloud Build) の中で認証なしに走るため、public であることが条件になる。py-gn-log が public リポジトリの tarball URL で SHA 固定しているのと同じ考え方で、2 つのライブラリの配布方針が揃う。
 
-git 参照ではビルド済みの `dist/` が必要なので、**`dist/` をコミットする**。二重管理 (ソースと生成物) を防ぐため、「`dist/` を空にしてから `npm run build` を実行し、`git status --porcelain dist/` が空である」ことを検査する (`git diff` では新規ファイルの追加漏れと古い出力の削除漏れを検出できない)。手元では `npm run check:dist` がこの検査で、CI (計画の PR 2) でも同じ検査を PR ごとに走らせる。`prepare` スクリプトで利用側にビルドさせる案は、git 参照のインストールでは利用側で `prepare` が実行され、利用側に TypeScript 7 が要るので採らない。
+git 参照ではビルド済みの `dist/` が必要なので、**`dist/` をコミットする**。二重管理 (ソースと生成物) を防ぐため、「`dist/` を空にしてから `npm run build` を実行し、`git status --porcelain dist/` が空である」ことを検査する (`git diff` では新規ファイルの追加漏れと古い出力の削除漏れを検出できない)。手元では `npm run check:dist` がこの検査で、CI (`.github/workflows/ci.yml`) でも同じ検査を PR ごとに走らせる。`prepare` スクリプトで利用側にビルドさせる案は、git 参照のインストールでは利用側で `prepare` が実行され、利用側に TypeScript 7 が要るので採らない。
 
 **この節が配布方針 (npm に公開しない理由、`dist/` をコミットする規律) の正本。** README のインストールと開発者向けの節はここを参照し、手順だけを書く。
 

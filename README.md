@@ -80,5 +80,5 @@ npm ci
 規律の正本は[設計案 §4.3](docs/designs/0001-ts-gn-log-design.md#43-配布-決定-public-リポジトリ--git-参照--dist-をコミット)です。手順だけを書きます。
 
 - `src/` を変えた PR では、最後に `npm run build` を実行して `dist/` を再生成し、ソースの変更とは別のコミットとして含める
-- PR を出す前に `npm run check:dist` を実行し、コミット済みの `dist/` が現在のソースから生成されるものと一致することを確かめる (CI はまだ無く、計画の PR 2 で同じ検査を入れる)
+- PR を出す前に `npm run check:dist` を実行し、コミット済みの `dist/` が現在のソースから生成されるものと一致することを確かめる。CI (`.github/workflows/ci.yml`) も同じ検査を PR ごとに走らせ、ずれていれば失敗する
 - `prepare` スクリプトは足さない (理由は §4.3)
