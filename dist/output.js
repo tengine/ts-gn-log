@@ -5,6 +5,7 @@
  * provider ごとのサブパス (`ts-gn-log/google/cloud-run` など) が決め、このモジュールの
  * 関数を組み合わせて入口 (`createLogger()`) を作る。
  */
+import { contextFields } from "./context.js";
 import { isEnabled } from "./level.js";
 /** 出力形式を明示的に指定する環境変数とその値。未設定なら provider の入口が渡す既定に従う */
 export const GNLOG_FORMAT_ENV_VAR = "GNLOG_FORMAT";
@@ -108,9 +109,13 @@ export function createCoreLogger(options) {
             let record;
             let line;
             try {
-                // 固定フィールド (child) と呼び出し時のフィールドを合流させてから err を分離する。
-                // child({ err }) で渡した err も同じ扱いにするため
-                const merged = { ...baseFields, ...(fields ?? {}) };
+                // 文脈 (ts-gn-log/context) < 固定フィールド (child) < 呼び出し時のフィールド の順に
+                // 重ねてから err を分離する。child({ err }) で渡した err も同じ扱いにするため
+                const merged = {
+                    ...contextFields(),
+                    ...baseFields,
+                    ...(fields ?? {}),
+                };
                 const { err, ...rest } = merged;
                 record = { name, level: recordLevel, message, timestamp: now(), fields: rest };
                 if ("err" in merged)
