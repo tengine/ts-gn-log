@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-
 import { isEnabled, levelFromEnv, levelValue, parseLevel } from "../src/level.js";
+import { typeofRows } from "./helpers.js";
 
 describe("parseLevel", () => {
   it("大文字・小文字を問わず 5 つのレベルを読む", () => {
@@ -55,11 +55,22 @@ describe("levelValue / isEnabled", () => {
 });
 
 describe("parseLevel は外部入力の正規化を 1 か所で担う", () => {
-  it("文字列以外 (null / 数値 / 配列 / オブジェクト) は投げずに既定に倒す", () => {
-    expect(parseLevel(null)).toBe("INFO");
-    expect(parseLevel(undefined)).toBe("INFO");
-    expect(parseLevel(20)).toBe("INFO");
-    expect(parseLevel(["ERROR"])).toBe("INFO");
-    expect(parseLevel({ level: "ERROR" }, "ERROR")).toBe("ERROR");
+  it.each(
+    typeofRows<"既定に倒す (投げない)">({
+      undefined: "既定に倒す (投げない)",
+      null: "既定に倒す (投げない)",
+      boolean: "既定に倒す (投げない)",
+      number: "既定に倒す (投げない)",
+      bigint: "既定に倒す (投げない)",
+      string: "既定に倒す (投げない)", // "s" は未知の文字列
+      symbol: "既定に倒す (投げない)",
+      function: "既定に倒す (投げない)",
+      array: "既定に倒す (投げない)",
+      "plain object": "既定に倒す (投げない)",
+      "class instance": "既定に倒す (投げない)",
+    }),
+  )("parseLevel に %s を渡すと %s", (_name, _expected, value) => {
+    expect(parseLevel(value)).toBe("INFO");
+    expect(parseLevel(value, "ERROR")).toBe("ERROR");
   });
 });

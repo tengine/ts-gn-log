@@ -192,7 +192,7 @@ function safeFields<Req>(
   fields: WithRequestTraceOptions<Req>["fields"],
   request: Req,
 ): ContextFields | undefined {
-  // newTrace と同じく返り値を正規化する (オブジェクト以外は捨て、予約キーは落とす)。
+  // newTrace と同じく返り値を正規化する (判定は normalizeContextFields。予約キーは落とす)。
   // 例外も既定 (fields 無し) に倒す
   try {
     return normalizeContextFields(typeof fields === "function" ? fields(request) : fields);

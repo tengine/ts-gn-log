@@ -10,9 +10,9 @@ py-gn-log と同じく、`ts-gn-log` の直下は provider (Google Cloud / AWS �
 
 | サブパス | 役割 | 状態 |
 |---|---|---|
-| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `level` / `output` / `trace` を再輸出 |
+| `ts-gn-log` | 共通部の再輸出。`google/*` は読み込まない | `context` / `fingerprint` / `level` / `output` / `trace` を再輸出 |
 | `ts-gn-log/context` | リクエスト / タスク単位の文脈を全ログ行に付ける (AsyncLocalStorage) | 実装済み |
-| `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 未実装 |
+| `ts-gn-log/fingerprint` | ERROR の dedup 用 fingerprint の正規化とハッシュ | 実装済み |
 | `ts-gn-log/level` | ログレベルの変換、`LOG_LEVEL` の読み取り | 実装済み |
 | `ts-gn-log/output` | 出力形式の決定 (`GNLOG_FORMAT`)、text 整形、stdout / stderr への書き出し、Logger の核 | 実装済み |
 | `ts-gn-log/trace` | W3C Trace Context (`traceparent`) の解釈・組み立てと、現在の trace の保持 | 実装済み |
@@ -99,7 +99,7 @@ await runWithContext({}, async () => {
 });
 ```
 
-`setContext` / `clearContext` は `runWithContext` の外では使えません (`Error` になります)。`runWithContext` の中で始めて `await` し忘れた処理から、範囲が終わった後に `setContext` した場合は、エラーにはならず、その書き込みは誰にも読まれません (その処理自身のログには、範囲が生きていた頃の文脈が付きます)。文脈の更新は、その範囲を待っている処理の中で行ってください。`runWithContext` は fn が返した Promise をそのまま返し、観測しません — `await` / `catch` しなかった reject は通常どおり unhandled rejection になります。Node の `AsyncLocalStorage` には Python の `ContextVar` のような「タスクごとに複製される Context」が無く、範囲の外で置いた値はプロセス全体の既定になって別のリクエストに漏れるため、範囲の中でしか更新できないようにしています。Next.js の Route Handler は `withRequestTrace` (Cloud Trace の節) で囲う前提です。
+`setContext` / `clearContext` は `runWithContext` の外では使えません (`Error` になります)。`runWithContext` の中で始めて `await` し忘れた処理から、範囲が終わった後に `setContext` した場合は、エラーにはならず、その書き込みは誰にも読まれません (その処理自身のログには、範囲が生きていた頃の文脈が付きます)。文脈の更新は、その範囲を待っている処理の中で行ってください。`runWithContext` は fn が返した Promise をそのまま返し、観測しません — `await` / `catch` しなかった reject は通常どおり unhandled rejection になります。範囲の中でしか更新できないようにしている理由 (`enterWith` を使わず `run` で張る) は [`src/context.ts`](src/context.ts) の docstring を参照してください。Next.js の Route Handler は `withRequestTrace` (Cloud Trace の節) で囲う前提です。
 
 - キー名は自由ですが、`severity` / `message` / `timestamp` / `name` / `logging.googleapis.com/labels` / `logging.googleapis.com/trace` / `logging.googleapis.com/spanId` / `logging.googleapis.com/trace_sampled` / `stack_trace` / `error` / `fields_error` / `format_error` / `err` は出力の固定キーと同名なので置けません (`Error` になります)。py-gn-log の `extra` と同じく snake_case を推奨します
 - `trace` は予約キーで、出力には混ぜません (`ts-gn-log/trace` と `ts-gn-log/google/cloud-trace` が使います)
@@ -128,6 +128,34 @@ export const POST = withRequestTrace(async (req: Request) => {
 - `logging.googleapis.com/trace` の組み立てにはプロジェクト ID が要ります。`createLogger({ projectId })` か環境変数 `GOOGLE_CLOUD_PROJECT` で指定し、どちらも無ければ trace のフィールドは付きません (既定値を持たない)。その場合でも `currentTrace()` と `traceHeaders()` は動くので、下流への引き継ぎはできます
 - `withRequestTrace` は `runWithContext` で囲むので、その中で `setContext` が使えます。`fields` オプションで、trace とあわせて置くフィールド (リクエストから組み立てる関数でもよい) を渡せます。py-gn-log の `cloud_trace.bind(trace, log_fields(...))` と違い、`logging.googleapis.com/trace` などの trace のフィールドは `fields` に渡しません (予約キー `trace` から `jsonFormat` が自動で組みます。渡すと型エラーになります)。`newTrace` / `fields` の関数が投げてもリクエストは落とさず、既定 (生成し直す / fields 無し) に倒します
 - HTTP 以外の経路 (Pub/Sub の属性、タスクのペイロード) では、発行側で `traceHeaders()` の値を属性に載せ、受信側で `traceFromHeaders(attributes)` (名前と値の Record を受けます) で取り出して `runWithTrace(trace, undefined, fn)` で囲みます
+
+### ERROR のログを同種ごとにまとめる fingerprint
+
+`ts-gn-log/fingerprint` は、メッセージの可変部 (ID、件数、引用文字列) を置き換えて正規化し、分類と組み合わせた短いハッシュを作ります (py-gn-log の `gnlog.fingerprint` と対)。Error Reporting が自動でグループ化できないエラー (例外を伴わない ERROR など) の dedup に使います。`createLogger` の `errorEvent` オプションが ERROR 以上のログに自動で付けるようにする予定です (PR 7 で実装)。
+
+```ts
+import { normalizeMessage, buildFingerprint } from "ts-gn-log/fingerprint";
+
+normalizeMessage('order 123 for "alice" not found');
+// => 'order <num> for <str> not found'
+buildFingerprint("worker", "orders.create", "validation", "order 123 missing");
+// => sha1("worker|orders.create|validation|order <num> missing") の先頭 16 文字
+```
+
+規則は py-gn-log との契約です。**この節は ts-gn-log の利用者に向けた挙動・制限・注意の正本です** (正規化とハッシュの規則そのものは [`src/fingerprint.ts`](src/fingerprint.ts) の docstring が正本)。**py-gn-log の挙動の正本は [py-gn-log の README](https://github.com/tengine/py-gn-log#readme)「fingerprint の規則 (他言語の実装との契約)」です。** 2 つは独立したライブラリなので、どちらか一方を唯一の正本にはしません。規則を変えるときは、**片方だけを変えて食い違ったままにするか、揃えるかを先に決めてください。** 揃えるなら両方に同時に PR を出すか、片方に同一性を確保する Issue を立てます。食い違いを選んだなら、互いの参照を消します。
+
+単一引用符には制限があります。引用の区切りとアポストロフィを同じ文字で兼ねるため、アポストロフィで始まる語 (`'cause`、`'90s`) の先頭や、対になっていない単一引用符が、開き引用符とみなされることがあります。**その後ろに次の単一引用符が現れると、それが所有格のアポストロフィであっても閉じ引用符として働き**、そこまでが `<str>` にまとまって、別種のエラーが同じ fingerprint になります (`'bob's file` は `<str>s file` になります)。後ろに単一引用符が現れなければ置き換えは起きません (`'cause it broke` はそのままです)。厳密さが必要なメッセージでは二重引用符を使ってください。
+
+このほかに、両言語で値が一致しない条件 (孤立サロゲート) と、入力の大きさについての注意があります。
+
+- **孤立サロゲート (両言語で値が一致しない条件)**: 対にならないサロゲート (JS 側で文字列を UTF-16 単位に切り詰めた結果、たとえば `"boom 😀".slice(0, 6)` に現れます) は UTF-8 にエンコードできません。ts 側は Node の既定に従って U+FFFD に置き換えて値を返します (ログの呼び出しは投げない方針に合わせています)。py-gn-log と値が一致するかは、孤立サロゲートが正規化と切り詰めの後にも残る位置にあるかで決まります。切り詰めで削られる位置にあれば影響せず、両言語の値は一致します (2026-09-14 に `buildFingerprint("w", "op", "t", "x".repeat(400) + "\uD83D")` と、py-gn-log の同じ引数の `build_fingerprint` を実行し、どちらも `ba925d5a90b03dee` になることを確認しました。値は surface / operation / error_type によって変わります。この一致を検査する関門はありません)。残る位置にあると、py 側は UTF-8 にエンコードできない文字列を扱うことになり、ts と同じ fingerprint が得られるとは限りません。**py 側で何が起きるか (例外になるか、ログの行が残るか) は前提にしないでください** (py-gn-log #34)。呼び出す前に ts 側でメッセージを切り詰めるなら、コードポイント単位で行ってください (UTF-16 コード単位で切ると孤立サロゲートを作ります)。
+- **入力の大きさ (呼び出し側の責務)**: 置換は入力の全体に走るので、`normalizeMessage` / `buildFingerprint` は入力の大きさに比例したメモリを使います。落ちるかどうかはヒープの大きさと置換でどれだけ膨らむか次第で、実測では、ヒープを 512MB に制限した環境で 40MB の数値を多く含むメッセージが `try`/`catch` で受けられない fatal OOM になり、既定のヒープ (約 4GB) では 40MB は通って 250MB 相当で落ちました。**上限は呼び出し側の責務です** (py-gn-log #35)。ログの経路での上限は[設計案 §2.5 fingerprint を付けない入力の上限](docs/designs/0001-ts-gn-log-design.md#25-fingerprint-を付けない入力の上限)を参照してください。
+
+両言語で同じ値になることは、py-gn-log の Python 実装から生成したゴールデンベクタ (`test/fixtures/fingerprint-golden.json`) で検証しています。軸は、正規化、`maxLength` を振った切り詰め (負の値と 0 を含む)、fingerprint です。規則を変えたときは py-gn-log の環境で再生成します:
+
+```
+cd ../py-gn-log && uv run python ../ts-gn-log/test/fixtures/generate-fingerprint-golden.py "$(git rev-parse --short HEAD)" > ../ts-gn-log/test/fixtures/fingerprint-golden.json
+```
 
 ## 環境変数
 
@@ -178,6 +206,10 @@ npm ci
 | `npm run test:cov` | カバレッジ付きでテストを実行する |
 | `npm run lint` | Biome で lint と書式を検査する |
 | `npm run format` | Biome で書式を整える |
+
+### 文書とテストの題に書く断定
+
+規則の正本は [CLAUDE.md](CLAUDE.md) の「文書とテストの題に書く断定」です。
 
 ### `dist/` をコミットする規律
 
