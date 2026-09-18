@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runWithContext } from "../src/context.js";
+import { getContext, runWithContext } from "../src/context.js";
 import { jsonFormat } from "../src/google/cloud-logging.js";
 import { createCoreLogger } from "../src/output.js";
 import { collect, FIXED_TIME } from "./helpers.js";
@@ -20,6 +20,17 @@ function makeLogger(fields?: Record<string, unknown>) {
 }
 
 describe("出力時に文脈のフィールドを混ぜる", () => {
+  it("文脈の入れ子の値を範囲の中で書き換えると、以降のログ行に書き換え後の値が出る (凍結は浅い)", () => {
+    const { log, last } = makeLogger();
+    runWithContext({ nested: { a: 1 } }, () => {
+      log.info("before");
+      expect(last()).toMatchObject({ message: "before", nested: { a: 1 } });
+      (getContext() as { nested: { a: number } }).nested.a = 999;
+      log.info("after");
+      expect(last()).toMatchObject({ message: "after", nested: { a: 999 } });
+    });
+  });
+
   it("runWithContext の中のログに文脈が付き、外では付かない", async () => {
     const { log, last } = makeLogger();
     await runWithContext({ request_id: "r1", site: "tokyo" }, async () => {
