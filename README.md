@@ -142,7 +142,7 @@ buildFingerprint("worker", "orders.create", "validation", "order 123 missing");
 // => sha1("worker|orders.create|validation|order <num> missing") の先頭 16 文字
 ```
 
-規則は py-gn-log との契約 (設計案 §2 の 3 番目) です。**この節は ts-gn-log の利用者に向けた挙動・制限・注意の正本です** (正規化とハッシュの規則そのものは [`src/fingerprint.ts`](src/fingerprint.ts) の docstring が正本)。**py-gn-log の挙動の正本は [py-gn-log の README](https://github.com/tengine/py-gn-log#readme)「fingerprint の規則 (他言語の実装との契約)」です。** 2 つは独立したライブラリなので、どちらか一方を唯一の正本にはしません。規則を変えるときは、**片方だけを変えて食い違ったままにするか、揃えるかを先に決めてください。** 揃えるなら両方に同時に PR を出すか、片方に同一性を確保する Issue を立てます。食い違いを選んだなら、互いの参照を消します。
+規則は py-gn-log との契約です。**この節は ts-gn-log の利用者に向けた挙動・制限・注意の正本です** (正規化とハッシュの規則そのものは [`src/fingerprint.ts`](src/fingerprint.ts) の docstring が正本)。**py-gn-log の挙動の正本は [py-gn-log の README](https://github.com/tengine/py-gn-log#readme)「fingerprint の規則 (他言語の実装との契約)」です。** 2 つは独立したライブラリなので、どちらか一方を唯一の正本にはしません。規則を変えるときは、**片方だけを変えて食い違ったままにするか、揃えるかを先に決めてください。** 揃えるなら両方に同時に PR を出すか、片方に同一性を確保する Issue を立てます。食い違いを選んだなら、互いの参照を消します。
 
 単一引用符には制限があります。引用の区切りとアポストロフィを同じ文字で兼ねるため、アポストロフィで始まる語 (`'cause`、`'90s`) の先頭や、対になっていない単一引用符が、開き引用符とみなされることがあります。**その後ろに次の単一引用符が現れると、それが所有格のアポストロフィであっても閉じ引用符として働き**、そこまでが `<str>` にまとまって、別種のエラーが同じ fingerprint になります (`'bob's file` は `<str>s file` になります)。後ろに単一引用符が現れなければ置き換えは起きません (`'cause it broke` はそのままです)。厳密さが必要なメッセージでは二重引用符を使ってください。
 
