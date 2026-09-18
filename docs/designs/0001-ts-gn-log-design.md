@@ -13,7 +13,7 @@ py-gn-log の TypeScript 版。Cloud Run 上の Node.js サーバ (当面は Nex
 | 対象 | Node.js で動くサーバ側コード。Cloud Run (Service / Job / Worker Pool) を第一に、ローカル開発も同じ API で動く |
 | 当面の利用者 | Next.js の Route Handler (`runtime = 'nodejs'`)。利用プロジェクト A の BFF はすべて nodejs runtime で、edge runtime の route は無い |
 | 対象外 (v0.1) | ブラウザ側のログ、Next.js middleware (edge)、Cloud Logging API への直接送信 (`@google-cloud/logging`)。Cloud Run では stdout/stderr への JSON 行が標準経路なので、API 送信は要らない |
-| py-gn-log との関係 | 同じ契約を 2 言語で実装する「対」。契約の正本は py-gn-log 側の Issue (#15 文脈、#17 Cloud Trace、#18 分類と fingerprint) で決め、ts-gn-log はそれに従う。片方だけで決めない |
+| py-gn-log との関係 | 同じ契約を 2 言語で実装する「対」。2 つは独立したライブラリで、各リポジトリの README が自分の挙動の正本になり、互いの README を参照し合う (§2)。契約の規則を変えるときは、片方だけを変えて食い違ったままにするか揃えるかを先に決める。片方だけで決めない |
 
 ## 2. 出力の契約 (py-gn-log と揃える部分)
 
@@ -54,7 +54,7 @@ py-gn-log (`e7119631`) の実出力と、利用プロジェクト A の自前実
 | `stack_trace` | `err.stack` | Error Reporting が認識するフィールド名。py-gn-log PR #9 と同じく ERROR 以上のみ |
 | 任意 (`errorEvent` を有効にしたとき、py-gn-log #18) | `event` (固定名) / `error_type` (未指定 `unknown`) / `operation` (未指定はロガー名) / `fingerprint` | 既定では付けない。利用側が現行の挙動を保ちたいときだけ有効化する |
 
-`fingerprint` の規則は py-gn-log #18 (main にマージ済み) と共有する。正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」と `src/gnlog/fingerprint.py`。要点: (1) UUID → `<uuid>`、引用文字列 → `<str>` (二重引用符、または直前が ASCII 英数字・下線でない単一引用符)、数値 (`\b\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?\b`、ASCII の意味の `\b` / `\d`) → `<num>` の順に置換、(2) 先頭 300 文字に切り詰め、(3) `surface` / `operation` / `error_type` / 正規化したメッセージのそれぞれで `\` → `\\`、`|` → `\|` に escape してから `|` で連結、(4) UTF-8 の SHA-1 の hex 先頭 16 文字。ゴールデンベクタは py-gn-log の tests を正本として複製し、両言語で一致を検証する。「300 文字」の単位 (コードポイントか UTF-16 コード単位か) は py-gn-log #26 で未決で、ts-gn-log の実装時にコードポイント単位で揃える案を #26 に出す。
+`fingerprint` の規則は py-gn-log #18 (main にマージ済み) と共有する。py-gn-log 側の挙動の正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」と `src/gnlog/fingerprint.py`、ts-gn-log 側の挙動の正本は ts-gn-log の README「ERROR のログを同種ごとにまとめる fingerprint」。要点: (1) UUID → `<uuid>`、引用文字列 → `<str>` (二重引用符、または直前が ASCII 英数字・下線でない単一引用符)、数値 (`\b\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?\b`、ASCII の意味の `\b` / `\d`) → `<num>` の順に置換、(2) 先頭 300 文字に切り詰め、(3) `surface` / `operation` / `error_type` / 正規化したメッセージのそれぞれで `\` → `\\`、`|` → `\|` に escape してから `|` で連結、(4) UTF-8 の SHA-1 の hex 先頭 16 文字。ゴールデンベクタは py-gn-log の tests を正本として複製し、両言語で一致を検証する。「300 文字」の単位 (コードポイントか UTF-16 コード単位か) は py-gn-log #26 で未決で、ts-gn-log の実装時にコードポイント単位で揃える案を #26 に出す。(5) 入力の上限 (**この項がこの決定の正本。他の文書はここへの参照にする**): ts-gn-log の `errorEvent` (PR 7 で実装) は、正規化の**前**のメッセージが 10,000 コードポイントを超えるとき fingerprint を付けず、行は出す。置換が入力の全体に走るため、上限が無いと巨大な入力でプロセスが落ちる (Node は catch できない fatal OOM)。2026-09-11 に ts-gn-log 側で決めた値で、py-gn-log には実装後に #35 の本文で同じ値と挙動を提案する。py-gn-log が合意した時点で両言語の契約になる (合意前は ts-gn-log だけの決定)。切り詰めではなく「付けない」にするのは、正規化の前に切ると引用文字列が切断位置をまたいだときに先頭 300 の結果が変わり、両言語の値がずれうるため。
 
 ### 2.4 py-gn-log 側に変更を求めるもの
 
@@ -200,4 +200,4 @@ ts-gn-log/
 
 ## 8. py-gn-log 側の状況 (2026-09-10 追記)
 
-設計時 (`e7119631`) に Issue として参照していた #15 (文脈) / #17 (Cloud Trace) / #18 (分類と fingerprint) は、いずれも py-gn-log の main にマージ済み。#30 で provider 固有の実装が `gnlog.google.*` (`cloud_run` / `cloud_logging` / `cloud_trace`) に再配置され (ts-gn-log も最初から同じ構造にする。§6)、v0.3.0 に上げる PR (#33) がレビュー中。ts-gn-log が揃える契約の正本は、Issue の議論ではなく **main の実装・README・tests** になった。
+設計時 (`e7119631`) に Issue として参照していた #15 (文脈) / #17 (Cloud Trace) / #18 (分類と fingerprint) は、いずれも py-gn-log の main にマージ済み。#30 で provider 固有の実装が `gnlog.google.*` (`cloud_run` / `cloud_logging` / `cloud_trace`) に再配置され (ts-gn-log も最初から同じ構造にする。§6)、v0.3.0 に上げる PR (#33) がレビュー中。ts-gn-log が py-gn-log 側の挙動を参照する先は、Issue の議論ではなく **main の実装・README・tests** になった (正本の置き方は §2)。
