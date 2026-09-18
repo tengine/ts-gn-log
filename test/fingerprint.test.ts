@@ -43,7 +43,7 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例を
     expect(normalizeMessage("abc", 10)).toBe("abc");
   });
 
-  it("負の maxLength は末尾から削る (Python の s[:negative] と同じ。ゴールデンベクタでも照合)", () => {
+  it("負の maxLength は末尾から削る", () => {
     expect(normalizeMessage("abcdef", -2)).toBe("abcd");
     expect(normalizeMessage("abcdef", -1)).toBe("abcde");
     expect(normalizeMessage("a😀b😀c", -2)).toBe("a😀b");
@@ -107,7 +107,7 @@ describe("normalizeMessage (py-gn-log の test_fingerprint.py と同じ事例を
     expect(normalizeMessage(s, undefined)).toHaveLength(300);
   });
 
-  it("巨大なメッセージ (10MB) でも配列に展開せず切り詰める", () => {
+  it("巨大なメッセージ (10MB) でも 300 コードポイントに切り詰める", () => {
     const big = "x".repeat(10 * 1024 * 1024);
     expect(Array.from(normalizeMessage(big))).toHaveLength(300);
   });
@@ -202,7 +202,7 @@ describe("buildFingerprint (py-gn-log の test_fingerprint.py と同じ事例を
     );
   });
 
-  it("他言語の実装と値を揃えるための参照値 (py-gn-log と同じ)", () => {
+  it("他言語の実装と値を揃えるための参照値", () => {
     expect(
       buildFingerprint(
         "worker",
