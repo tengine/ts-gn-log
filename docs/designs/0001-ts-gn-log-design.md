@@ -128,7 +128,9 @@ export const POST = withRequestTrace(async (req) => { ... }) // Next.js Route Ha
 
 py-gn-log と同じく **npm には公開せず、public リポジトリを git 参照**で使う (`"ts-gn-log": "github:tengine/ts-gn-log#v0.1.0"`。tag か SHA で版を固定)。利用側の `npm ci` は Docker ビルド (Cloud Build) の中で認証なしに走るため、public であることが条件になる。py-gn-log が public リポジトリの tarball URL で SHA 固定しているのと同じ考え方で、2 つのライブラリの配布方針が揃う。
 
-git 参照ではビルド済みの `dist/` が必要なので、**`dist/` をコミットする**。二重管理 (ソースと生成物) を防ぐため、CI で「`npm run build` の結果がコミット済みの `dist/` と一致する」ことを検査する。`prepare` スクリプトで利用側にビルドさせる案は、利用側に TypeScript 7 が要るので採らない。
+git 参照ではビルド済みの `dist/` が必要なので、**`dist/` をコミットする**。二重管理 (ソースと生成物) を防ぐため、「`dist/` を空にしてから `npm run build` を実行し、`git status --porcelain dist/` が空である」ことを検査する (`git diff` では新規ファイルの追加漏れと古い出力の削除漏れを検出できない)。手元では `npm run check:dist` がこの検査で、CI (計画の PR 2) でも同じ検査を PR ごとに走らせる。`prepare` スクリプトで利用側にビルドさせる案は、git 参照のインストールでは利用側で `prepare` が実行され、利用側に TypeScript 7 が要るので採らない。
+
+**この節が配布方針 (npm に公開しない理由、`dist/` をコミットする規律) の正本。** README のインストールと開発者向けの節はここを参照し、手順だけを書く。
 
 検討して採らなかった配布方法:
 
@@ -149,7 +151,7 @@ git 参照ではビルド済みの `dist/` が必要なので、**`dist/` をコ
 
 ## 6. リポジトリ構成案
 
-py-gn-log #30 と同じく、直下は provider (Google Cloud / AWS 等) を知らない共通部、provider ごとの実装は `google/` 配下に置く。`ts-gn-log` (index) は共通部だけを再輸出し、`google/*` を読み込まない。利用側は `ts-gn-log/google/cloud-run` を入口にする。
+py-gn-log #30 と同じく、直下は provider (Google Cloud / AWS 等) を知らない共通部、provider ごとの実装は `google/` 配下に置く。`ts-gn-log` (index) は共通部だけを再輸出し、`google/*` を読み込まない。利用側は `ts-gn-log/google/cloud-run` を入口にする。**下の対応表がサブパスと役割の正本。** README の「パッケージの構造」はここを参照し、実装の状態を添えた要約を持つ。
 
 | py-gn-log | ts-gn-log (サブパス) | 役割 |
 |---|---|---|
@@ -176,7 +178,7 @@ ts-gn-log/
 │       ├── cloud-logging.ts  JSON 整形
 │       └── cloud-trace.ts    Web 標準の Headers / Request を受ける
 ├── test/               Vitest。fingerprint のゴールデンベクタは py-gn-log と共有
-├── dist/               tsc の出力 (ESM + .d.ts)。git 参照で使うためコミットする。CI でソースとの一致を検査
+├── dist/               tsc の出力 (ESM + .d.ts)。git 参照で使うためコミットする。ソースとの一致を検査する (§4.3)
 ├── biome.json
 ├── tsconfig.json       target ES2022, module NodeNext, strict, declaration
 ├── package.json        name: ts-gn-log, type: module, exports (上の表のサブパスごと), engines.node >=24, private: true (npm 非公開。git 参照には影響しない)

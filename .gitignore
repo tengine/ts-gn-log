@@ -1,1 +1,8 @@
+node_modules/
+coverage/
 tmp/
+bin/
+# review-triage の設定と記録 (作業環境ごとに持ち、リポジトリには含めない)
+.claude/review-triage.yaml
+.claude/akm-claude-plugins/review-triage/
+docs/review-triages/
