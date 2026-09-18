@@ -19,7 +19,7 @@ interface Golden {
 }
 
 // py-gn-log の Python 実装 (src/gnlog/fingerprint.py) から生成したゴールデンベクタ。
-// 正本は py-gn-log 側。再生成の手順は README の「fingerprint」の節
+// 再生成の手順は README の「ERROR のログを同種ごとにまとめる fingerprint」の節
 const golden: Golden = JSON.parse(
   readFileSync(new URL("./fixtures/fingerprint-golden.json", import.meta.url), "utf8"),
 );
