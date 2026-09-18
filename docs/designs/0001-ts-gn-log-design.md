@@ -54,7 +54,7 @@ py-gn-log (`e7119631`) の実出力と、利用プロジェクト A の自前実
 | `stack_trace` | `err.stack` | Error Reporting が認識するフィールド名。py-gn-log PR #9 と同じく ERROR 以上のみ |
 | 任意 (`errorEvent` を有効にしたとき、py-gn-log #18) | `event` (固定名) / `error_type` (未指定 `unknown`) / `operation` (未指定はロガー名) / `fingerprint` | 既定では付けない。利用側が現行の挙動を保ちたいときだけ有効化する |
 
-`fingerprint` の規則は py-gn-log #18 (main にマージ済み) と共有する。py-gn-log 側の挙動の正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」と `src/gnlog/fingerprint.py`、ts-gn-log 側の利用者に向けた挙動・制限・注意の正本は ts-gn-log の README「ERROR のログを同種ごとにまとめる fingerprint」。**正規化とハッシュの規則そのものは `src/fingerprint.ts` の docstring が正本** (判定の 3 つのパターンの隣にあり、式を引用して書いてある)。この項と README はそこへの参照にする。ゴールデンベクタは py-gn-log の実装から生成スクリプト (test/fixtures/generate-fingerprint-golden.py) で作り、両言語で一致を検証する。「300 文字」の単位は py-gn-log #26 で扱う。
+`fingerprint` の規則は py-gn-log #18 と共有する。py-gn-log 側の挙動の正本は py-gn-log の README「fingerprint の規則 (他言語の実装との契約)」と `src/gnlog/fingerprint.py`、ts-gn-log 側の利用者に向けた挙動・制限・注意の正本は ts-gn-log の README「ERROR のログを同種ごとにまとめる fingerprint」。**正規化とハッシュの規則そのものは `src/fingerprint.ts` の docstring が正本** (判定の 3 つのパターンの隣にあり、式を引用して書いてある)。この項と README はそこへの参照にする。ゴールデンベクタは py-gn-log の実装から生成スクリプト (test/fixtures/generate-fingerprint-golden.py) で作り、両言語で一致を検証する。「300 文字」の単位は py-gn-log #26 で扱う。
 
 ### 2.4 py-gn-log 側に変更を求めるもの
 
@@ -204,6 +204,8 @@ ts-gn-log/
 - ~~py-gn-log 側の `stack_info: null` (§2.4) を外すかどうか~~ → 揃える対象ではないと整理し、変更を求めない (2026-09-10。§2 冒頭と §2.4)
 - fingerprint の「300 文字」の単位 (py-gn-log #26)
 
-## 8. py-gn-log 側の状況 (2026-09-10 追記)
+## 8. py-gn-log 側を参照する先
 
-設計時 (`e7119631`) に Issue として参照していた #15 (文脈) / #17 (Cloud Trace) / #18 (分類と fingerprint) は、いずれも py-gn-log の main にマージ済み。#30 で provider 固有の実装が `gnlog.google.*` (`cloud_run` / `cloud_logging` / `cloud_trace`) に再配置され (ts-gn-log も最初から同じ構造にする。§6)、v0.3.0 に上げる PR (#33) がレビュー中。ts-gn-log が py-gn-log 側の挙動を参照する先は、Issue の議論ではなく **main の実装・README・tests** になった (正本の置き方は §2)。
+設計時 (`e7119631`) は py-gn-log の Issue を参照先にしていた。#15 (文脈) / #17 (Cloud Trace) / #18 (分類と fingerprint) がそれで、provider 固有の実装の `gnlog.google.*` (`cloud_run` / `cloud_logging` / `cloud_trace`) への再配置は #30 が扱う (ts-gn-log も最初から同じ構造にする。§6)。
+
+ts-gn-log が py-gn-log 側の挙動を参照する先は、Issue の議論ではなく **main の実装・README・tests** にする (正本の置き方は §2)。Issue の状態はこのリポジトリの関門では確かめられないので、番号で何を指すかだけを書き、状態は書かない。

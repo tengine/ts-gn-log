@@ -107,7 +107,7 @@ describe("createLogger", () => {
 
   it("level に未知の値が来ても INFO に倒し、ログが全部消えることはない (LOG_LEVEL と同じ)", () => {
     const out = collect();
-    // JS からの利用や JSON.parse した設定値を模して、型検査をすり抜けた値を渡す
+    // JS からの利用や JSON.parse した設定値を模して、型検査を受けていない値を渡す
     const bogus = "TRACE" as unknown as "INFO";
     const log = createLogger({ name: "bff", env: {}, level: bogus, json: true, write: out.write });
     log.debug("hidden");
