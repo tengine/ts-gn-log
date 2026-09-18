@@ -1,6 +1,6 @@
 {
   "name": "ts-gn-log",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Cloud Run 上の Node.js サーバから Cloud Logging 向けの構造化ログを出すライブラリ (py-gn-log の TypeScript 版)",
   "private": true,
   "type": "module",
@@ -18,6 +18,10 @@
     "./context": {
       "types": "./dist/context.d.ts",
       "default": "./dist/context.js"
+    },
+    "./fingerprint": {
+      "types": "./dist/fingerprint.d.ts",
+      "default": "./dist/fingerprint.js"
     },
     "./level": {
       "types": "./dist/level.d.ts",
