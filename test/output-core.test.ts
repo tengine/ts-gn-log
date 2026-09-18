@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LEVELS } from "../src/level.js";
+
 import { createCoreLogger, writeToStdio } from "../src/output.js";
 import { collect, FIXED_TIME } from "./helpers.js";
 
@@ -92,14 +94,12 @@ describe("createCoreLogger の固定フィールド", () => {
 describe("writeToStdio", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("ERROR 以上は stderr、それ以外は stdout に改行付きで書く", () => {
+  it("ERROR 以上は stderr、それ以外は stdout に改行付きで書く (LEVELS の全値を回す)", () => {
     const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    writeToStdio("INFO", "a");
-    writeToStdio("WARNING", "b");
-    writeToStdio("ERROR", "c");
-    writeToStdio("CRITICAL", "d");
-    expect(stdout.mock.calls.map((c) => c[0])).toEqual(["a\n", "b\n"]);
-    expect(stderr.mock.calls.map((c) => c[0])).toEqual(["c\n", "d\n"]);
+    for (const level of LEVELS) writeToStdio(level, level);
+    // LEVELS に値が増えると、どちらかの期待の列に足すまでこのテストは失敗する
+    expect(stdout.mock.calls.map((c) => c[0])).toEqual(["DEBUG\n", "INFO\n", "WARNING\n"]);
+    expect(stderr.mock.calls.map((c) => c[0])).toEqual(["ERROR\n", "CRITICAL\n"]);
   });
 });
