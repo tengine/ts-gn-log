@@ -8,7 +8,7 @@ import { type Logger, type Writer } from "../output.js";
 /**
  * Cloud Run (Service / Job / Worker Pool) 上で実行されているかを判定する。
  *
- * py-gn-log の `is_cloud_run()` と同じく、3 つの環境変数のいずれかが存在する
+ * py-gn-log の `is_cloud_run()` と同じく、CLOUD_RUN_ENV_VARS の環境変数のいずれかが存在する
  * (値が空文字列でも存在すれば真) ことで判定する。
  */
 export declare function isCloudRun(env?: Env): boolean;
@@ -22,7 +22,7 @@ export interface CreateLoggerOptions {
     name: string;
     /** 全行の logging.googleapis.com/labels に入れる固定の labels (JSON 形式のみ) */
     labels?: Record<string, string>;
-    /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO。未知の値は INFO に倒す (LOG_LEVEL と同じ) */
+    /** 出力するレベルの下限。省略時は環境変数 LOG_LEVEL、無ければ INFO。値の扱いは `parseLevel` の docstring を参照 */
     level?: Level;
     /** true なら JSON、false なら text。省略時は環境変数 GNLOG_FORMAT、無ければ Cloud Run 上なら JSON */
     json?: boolean;

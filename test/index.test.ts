@@ -8,6 +8,7 @@ describe("ts-gn-log の入口", () => {
     expect(keys).toContain("parseLevel");
     expect(keys).toContain("runWithContext");
     expect(keys).toContain("parseTraceparent");
+    expect(keys).toContain("buildFingerprint");
     expect(keys).not.toContain("parseCloudTraceContext");
     expect(keys).toContain("createCoreLogger");
     expect(keys).toContain("useJsonOutput");
