@@ -8,6 +8,10 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # main への push で、型の検査とカバレッジの結果を、コミットのステータスに書くため
+      statuses: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,8 +20,34 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
-      - run: npm run typecheck
+      - id: typecheck
+        run: npm run typecheck
+      # main への push のときだけ、型の検査の結果を、コミットのステータス measure/typecheck に書く。
+      # 組織 tengine のリポジトリの CI の状況を、リポジトリ tengine/repo-management で集めるため
+      # (名前と書く値の決まりは、tengine/repo-management の docs/ci-measurements.md)。
+      # 型の検査が失敗しても書くので always() を付ける。ステップを飛ばした・取り消したときは書かない。
+      - name: report typecheck result as commit status
+        if: >-
+          always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+          && (steps.typecheck.outcome == 'success' || steps.typecheck.outcome == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.typecheck.outcome }}
+        run: |
+          gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state="$OUTCOME" -f context=measure/typecheck -f description="tsc: $OUTCOME"
       - run: npm test
+      # main への push のときだけ、カバレッジを測りながらテストを実行し、行の割合をコミットのステータス
+      # measure/line-coverage に書く (理由は上と同じ)。npm test はそのまま残し、測るためのテストは別に実行する。
+      - name: report coverage as commit status
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          npm run test:cov -- --coverage.reporter=text-summary --coverage.reporter=json-summary
+          total="$(node -p "require('./coverage/coverage-summary.json').total.lines.pct.toFixed(1)")"
+          gh api --silent "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state=success -f context=measure/line-coverage -f description="$total%"
       - run: npm run build
       - run: npm run check:dist
       - run: npx --yes publint@0.3.24
